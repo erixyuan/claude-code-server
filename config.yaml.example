@@ -1,0 +1,35 @@
+# Claude Code Server API Configuration
+
+# Server settings
+host: "0.0.0.0"
+port: 8000
+workers: 1
+reload: false  # Set to true for development
+
+# Claude Code settings
+claude_bin: "claude"  # Path to claude CLI executable
+working_directory: "/Users/eric/Project/viralt/claude-code-server-test-folder"  # Claude CLI working directory
+disable_prompt_caching: true  # Disable to avoid cache_control limit
+default_timeout: 300  # Default timeout in seconds
+
+# API settings
+default_response_mode: "sync"  # Options: sync, stream, async
+enable_cors: true
+cors_origins:
+  - "*"  # Allow all origins (change in production!)
+
+# Session settings
+session_store_type: "file"  # Options: memory, file, redis
+session_storage_dir: ".sessions"  # Directory for file-based storage
+redis_url: "redis://localhost:6379"  # Redis connection URL (if using redis)
+session_ttl: 3600  # Session TTL in seconds
+
+# Security (optional)
+# api_key: "your-secret-api-key-here"  # Uncomment to enable API key auth
+# allowed_users:  # Uncomment to restrict users
+#   - "alice"
+#   - "bob"
+
+# Task queue settings (for async mode)
+max_concurrent_tasks: 10
+task_timeout: 600
