@@ -317,15 +317,18 @@ config = load_config(args.config)
 setup_logging(config.logging.model_dump())  # 初始化日志
 ```
 
-### 步骤 6: 🔄 替换代码中的 print()（待完成）
-需要替换以下文件：
-- [ ] `claude_code_server/client.py`
-- [ ] `claude_code_server/agent.py`
-- [ ] `claude_code_server/file_session_store.py`
-- [ ] `claude_code_server_api/server.py`
-- [ ] 其他使用 `print()` 的地方
+### 步骤 6: ✅ 替换代码中的 print()
+已完成替换以下文件：
+- [x] `claude_code_server/client.py` - 7处
+- [x] `claude_code_server/agent.py` - 0处
+- [x] `claude_code_server/file_session_store.py` - 4处
+- [x] `claude_code_server_api/server.py` - 7处
+- [x] `claude_code_server_api/config.py` - 3处
 
-### 步骤 7: 测试
+### 步骤 7: ✅ 实现 Agent 消息日志
+新增 `_log_agent_message()` 方法，美观地打印每条 Agent SDK 消息
+
+### 步骤 8: 测试
 ```bash
 # 测试日志系统
 python start_server.py
@@ -501,6 +504,103 @@ class InterceptHandler(logging.Handler):
 
 logging.basicConfig(handlers=[InterceptHandler()], level=0)
 ```
+
+## 🎨 Agent 消息日志（新功能）
+
+### 功能说明
+
+专门为 Claude Agent SDK 返回的消息设计的结构化日志输出。
+
+### 输出效果
+
+**INFO 级别输出：**
+
+```
+2025-11-16 00:10:15 | INFO     | claude_code_server.client:_parse_response - 📨 收到 3 条 Agent 消息
+
+2025-11-16 00:10:15 | INFO     | claude_code_server.client:_log_agent_message - ┌─ 消息 [1/3] - SystemMessage
+2025-11-16 00:10:15 | INFO     | claude_code_server.client:_log_agent_message - │  🔑 会话ID: 8a7c4e12-3b6f-4d9a-a2c1-5e8f9b0d3c7e
+2025-11-16 00:10:15 | INFO     | claude_code_server.client:_log_agent_message - └─ 结束
+
+2025-11-16 00:10:17 | INFO     | claude_code_server.client:_log_agent_message - ┌─ 消息 [2/3] - AssistantMessage
+2025-11-16 00:10:17 | INFO     | claude_code_server.client:_log_agent_message - │  💬 内容块数量: 2
+2025-11-16 00:10:17 | INFO     | claude_code_server.client:_log_agent_message - │    [1] 📝 TextBlock: 你好！我是 Claude，一个 AI 助手。我可以帮助你完成各种任务...
+2025-11-16 00:10:17 | INFO     | claude_code_server.client:_log_agent_message - │    [2] 🔧 ToolUse: read_file
+2025-11-16 00:10:17 | INFO     | claude_code_server.client:_log_agent_message - └─ 结束
+
+2025-11-16 00:10:18 | INFO     | claude_code_server.client:_log_agent_message - ┌─ 消息 [3/3] - ResultMessage
+2025-11-16 00:10:18 | INFO     | claude_code_server.client:_log_agent_message - │  🔑 会话ID: 8a7c4e12-3b6f-4d9a-a2c1-5e8f9b0d3c7e
+2025-11-16 00:10:18 | INFO     | claude_code_server.client:_log_agent_message - │  ✅ 结果: Success
+2025-11-16 00:10:18 | INFO     | claude_code_server.client:_log_agent_message - └─ 结束
+```
+
+**DEBUG 级别输出（更详细）：**
+
+```
+2025-11-16 00:10:17 | DEBUG    | claude_code_server.client:_log_agent_message - │        完整长度: 456 字符
+2025-11-16 00:10:17 | DEBUG    | claude_code_server.client:_log_agent_message - │        参数: {"path": "test.py", "encoding": "utf-8"}
+2025-11-16 00:10:18 | DEBUG    | claude_code_server.client:_log_agent_message - │  📊 元数据: {"tokens_used": 1234, "execution_time": 2.5}
+```
+
+### 支持的消息类型
+
+| 消息类型 | 图标 | 显示内容 |
+|---------|------|---------|
+| **SystemMessage** | 🔑 | 会话ID、系统信息 |
+| **AssistantMessage** | 💬 | 内容块数量、文本预览 |
+| **ResultMessage** | ✅ | 结果统计、元数据 |
+
+### 支持的内容块类型
+
+| 块类型 | 图标 | 显示方式 |
+|--------|------|---------|
+| **TextBlock** | 📝 | 前150字符 + 完整长度 |
+| **ToolUse** | 🔧 | 工具名 + 参数（DEBUG） |
+| **String** | 📄 | 前100字符 |
+| **其他** | ❓ | 前100字符（DEBUG） |
+
+### 方法签名
+
+```python
+def _log_agent_message(self, msg, index: int, total: int):
+    """打印 Agent 消息（格式化、易读）
+    
+    Args:
+        msg: Agent 消息对象
+        index: 消息序号（从1开始）
+        total: 消息总数
+    """
+```
+
+### 使用示例
+
+```python
+from claude_code_server import ClaudeClient
+
+client = ClaudeClient()
+response = client.chat("你好")  # 自动打印所有消息
+```
+
+### 日志级别控制
+
+```yaml
+# INFO 级别：显示消息结构和关键信息
+logging:
+  level: "INFO"
+
+# DEBUG 级别：显示完整内容和元数据
+logging:
+  level: "DEBUG"
+```
+
+### 优势
+
+1. **结构清晰** - 使用框架符号（┌─ │ └─）分隔消息
+2. **自动编号** - 显示消息序号 [1/3]
+3. **智能截断** - 长内容自动截断，避免刷屏
+4. **类型识别** - 自动识别不同消息和内容块类型
+5. **分级显示** - INFO 看结构，DEBUG 看细节
+6. **中文友好** - 所有提示都是中文
 
 ## 🎓 总结
 

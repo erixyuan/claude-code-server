@@ -92,6 +92,7 @@ class ClaudeClient:
             """收集所有消息"""
             messages = []
             async for msg in query(prompt=message, options=options):
+                logger.info(f"🔍 收到消息: {msg}")
                 messages.append(msg)
             return messages
         
@@ -194,8 +195,14 @@ class ClaudeClient:
         content_parts = []
         session_id = None
         
-        for msg in messages:
+        # 打印收到的消息总数
+        logger.info(f"📨 收到 {len(messages)} 条 Agent 消息")
+        
+        for idx, msg in enumerate(messages, 1):
             msg_type = type(msg).__name__
+            
+            # 记录每条消息的详细信息
+            self._log_agent_message(msg, idx, len(messages))
 
             # 提取会话 ID（来自 SystemMessage 或 ResultMessage）
             if hasattr(msg, 'session_id') and msg.session_id:
@@ -218,6 +225,84 @@ class ClaudeClient:
                 "message_count": len(messages),
             },
         )
+    
+    def _log_agent_message(self, msg, index: int, total: int):
+        """打印 Agent 消息（格式化、易读）
+        
+        专门用于记录 Claude Agent SDK 返回的消息，
+        提供结构化、美观的日志输出。
+        
+        Args:
+            msg: Agent 消息对象
+            index: 消息序号（从1开始）
+            total: 消息总数
+        """
+        msg_type = type(msg).__name__
+        
+        # 消息头部
+        logger.info(f"┌─ 消息 [{index}/{total}] - {msg_type}")
+        
+        # SystemMessage: 系统初始化
+        if msg_type == 'SystemMessage':
+            if hasattr(msg, 'session_id') and msg.session_id:
+                logger.info(f"│  🔑 会话ID: {msg.session_id}")
+            if hasattr(msg, 'content'):
+                logger.debug(f"│  📄 内容: {str(msg.content)[:200]}")
+        
+        # AssistantMessage: Claude 回复
+        elif msg_type == 'AssistantMessage':
+            if hasattr(msg, 'content'):
+                # 统计内容块
+                blocks = msg.content if isinstance(msg.content, list) else [msg.content]
+                logger.info(f"│  💬 内容块数量: {len(blocks)}")
+                
+                # 打印每个内容块
+                for block_idx, block in enumerate(blocks, 1):
+                    block_type = type(block).__name__
+                    
+                    # TextBlock: 文本内容
+                    if hasattr(block, 'text'):
+                        text = block.text
+                        text_preview = text[:150].replace('\n', '\\n')
+                        if len(text) > 150:
+                            text_preview += "..."
+                        logger.info(f"│    [{block_idx}] 📝 {block_type}: {text_preview}")
+                        logger.debug(f"│        完整长度: {len(text)} 字符")
+                    
+                    # ToolUse: 工具调用
+                    elif hasattr(block, 'name'):
+                        logger.info(f"│    [{block_idx}] 🔧 {block_type}: {block.name}")
+                        if hasattr(block, 'input'):
+                            logger.debug(f"│        参数: {block.input}")
+                    
+                    # 字符串块
+                    elif isinstance(block, str):
+                        preview = block[:100].replace('\n', '\\n')
+                        if len(block) > 100:
+                            preview += "..."
+                        logger.info(f"│    [{block_idx}] 📄 String: {preview}")
+                    
+                    # 其他类型
+                    else:
+                        logger.debug(f"│    [{block_idx}] ❓ {block_type}: {str(block)[:100]}")
+        
+        # ResultMessage: 结果统计
+        elif msg_type == 'ResultMessage':
+            if hasattr(msg, 'session_id') and msg.session_id:
+                logger.info(f"│  🔑 会话ID: {msg.session_id}")
+            if hasattr(msg, 'result'):
+                result_str = str(msg.result)[:200]
+                logger.info(f"│  ✅ 结果: {result_str}")
+            if hasattr(msg, 'metadata'):
+                logger.debug(f"│  📊 元数据: {msg.metadata}")
+        
+        # 其他消息类型
+        else:
+            logger.debug(f"│  ❓ 未知类型: {str(msg)[:200]}")
+        
+        # 消息尾部
+        logger.info(f"└─ 结束")
+
 
     def _print_debug_info(self, message: str, session_id: Optional[str], config: ClaudeConfig):
         """打印调试信息"""
