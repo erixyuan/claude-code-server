@@ -1,51 +1,44 @@
-"""
-Claude Agent SDK client implementation.
+"""Claude Agent SDK 客户端实现
 
-This module provides a client using the official claude-agent-sdk.
+使用官方 claude-agent-sdk 与 Claude 交互。
+Simple is better than complex.
 """
 
-from typing import Optional
-from pathlib import Path
 import asyncio
+from pathlib import Path
+from typing import Optional
 
+from .exceptions import ClaudeExecutionError, InvalidConfigError
 from .types import ClaudeConfig, ClaudeResponse
-from .exceptions import ClaudeExecutionError, TimeoutError, InvalidConfigError
 
-# Try to import Claude Agent SDK
+# 尝试导入 Claude Agent SDK
 try:
-    from claude_agent_sdk import query, ClaudeAgentOptions
+    from claude_agent_sdk import ClaudeAgentOptions, query
     SDK_AVAILABLE = True
 except ImportError:
     SDK_AVAILABLE = False
-    # Define placeholder to avoid NameError
     query = None
     ClaudeAgentOptions = None
 
 
 class ClaudeClient:
-    """
-    A Python client to interact with Claude using the official Agent SDK.
-
-    Example:
+    """Claude 客户端 - 使用官方 Agent SDK
+    
+    最简单的使用方式：
         >>> client = ClaudeClient()
-        >>> response = client.chat("Hello, Claude!")
+        >>> response = client.chat("你好")
         >>> print(response.content)
     """
 
-    def __init__(
-        self,
-        config: Optional[ClaudeConfig] = None,
-    ):
-        """
-        Initialize Claude client.
-
+    def __init__(self, config: Optional[ClaudeConfig] = None):
+        """初始化客户端
+        
         Args:
-            config: Configuration for Claude SDK behavior
+            config: 配置对象，默认使用 ClaudeConfig()
         """
         if not SDK_AVAILABLE:
-            raise ImportError(
-                "claude-agent-sdk is not installed. Please install it with: "
-                "pip install claude-agent-sdk"
+            raise InvalidConfigError(
+                "claude-agent-sdk 未安装。请运行：pip install claude-agent-sdk"
             )
         self.config = config or ClaudeConfig()
 
@@ -53,234 +46,183 @@ class ClaudeClient:
         self,
         message: str,
         session_id: Optional[str] = None,
-        config_override: Optional[ClaudeConfig] = None,
         claude_session_id: Optional[str] = None,
+        config_override: Optional[ClaudeConfig] = None,
     ) -> ClaudeResponse:
-        """
-        Send a message to Claude and get response.
-
+        """发送消息给 Claude
+        
         Args:
-            message: The message to send to Claude
-            session_id: Optional user session ID (for reference only)
-            config_override: Override default config for this request
-            claude_session_id: Optional Claude session ID (from previous response)
-
+            message: 要发送的消息
+            session_id: 用户会话 ID（仅用于引用）
+            claude_session_id: Claude SDK 的会话 ID（用于恢复对话）
+            config_override: 覆盖默认配置
+            
         Returns:
-            ClaudeResponse containing the response content and metadata
-
-        Raises:
-            ClaudeExecutionError: If Claude SDK execution fails
-            TimeoutError: If execution times out
+            ClaudeResponse 包含响应内容和元数据
         """
         config = config_override or self.config
         
-        # Print command for debugging (if enabled)
+        # 调试信息（如果启用）
         if config.debug_print_command:
-            print("\n" + "="*80)
-            print("🚀 Executing Claude Agent SDK:")
-            print("="*80)
-            print(f"Message: {message[:100]}{'...' if len(message) > 100 else ''}")
-            print(f"Session ID: {claude_session_id or 'None'}")
-            print(f"Working Directory: {config.working_directory or 'Current'}")
-            print("="*80 + "\n")
-
+            self._print_debug_info(message, claude_session_id, config)
+        
         try:
-            # Build options for Claude Agent SDK
+            # 1. 构建选项
             options = self._build_options(config, claude_session_id)
             
-            # Call Claude Agent SDK (it's async, so we need to run it)
-            result = self._run_query_sync(message, options)
+            # 2. 调用 SDK（异步转同步）
+            messages = self._run_query(message, options)
             
-            return self._parse_response(result, config)
-
+            # 3. 解析响应
+            return self._parse_response(messages)
+            
         except Exception as e:
             raise ClaudeExecutionError(
-                message=f"Claude Agent SDK execution failed: {str(e)}",
+                f"Claude Agent SDK 执行失败: {str(e)}",
                 return_code=-1,
             )
-    
-    def _run_query_sync(self, message: str, options):
-        """Run the async query function synchronously."""
-        async def _run():
+
+    def _run_query(self, message: str, options: ClaudeAgentOptions) -> list:
+        """运行异步查询（同步方式）
+        
+        SDK 的 query 是异步生成器，这里转换为同步调用。
+        """
+        async def collect_messages():
+            """收集所有消息"""
             messages = []
             async for msg in query(prompt=message, options=options):
                 messages.append(msg)
             return messages
         
-        # Run the async function and get results
+        # 获取或创建事件循环
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
         
-        return loop.run_until_complete(_run())
+        return loop.run_until_complete(collect_messages())
 
     def _build_options(
-        self,
-        config: ClaudeConfig,
-        session_id: Optional[str],
+        self, 
+        config: ClaudeConfig, 
+        session_id: Optional[str]
     ) -> ClaudeAgentOptions:
-        """Build the Claude Agent SDK options."""
-        # Load system prompt
-        system_prompt = self._load_system_prompt(config)
+        """构建 SDK 选项
         
-        # Create options
-        options_dict = {}
+        将我们的 ClaudeConfig 转换为 SDK 所需的 ClaudeAgentOptions。
+        注意：SDK 使用不同的参数名（如 cwd 而不是 working_directory）
+        """
+        options = {}
         
-        # Model
+        # 模型
         if config.model:
-            options_dict["model"] = config.model
+            options["model"] = config.model
         
-        # Permission mode
+        # 权限模式
         if config.permission_mode:
-            options_dict["permission_mode"] = config.permission_mode
+            options["permission_mode"] = config.permission_mode
         
-        # System prompt
+        # 系统提示（从配置文件加载）
+        system_prompt = self._load_system_prompt(config)
         if system_prompt:
-            options_dict["system_prompt"] = system_prompt
+            options["system_prompt"] = system_prompt
         
-        # Working directory (SDK uses 'cwd' not 'working_directory')
+        # 工作目录（SDK 使用 'cwd'）
         if config.working_directory:
-            options_dict["cwd"] = config.working_directory
+            options["cwd"] = config.working_directory
         
-        # Allowed tools
+        # 允许的工具
         if config.allowed_tools:
-            options_dict["allowed_tools"] = config.allowed_tools
+            options["allowed_tools"] = config.allowed_tools
         
-        # Session ID for resuming (SDK uses 'resume' parameter)
+        # 恢复会话（SDK 使用 'resume'）
         if session_id:
-            options_dict["resume"] = session_id
+            options["resume"] = session_id
         
-        # Setting sources
-        options_dict["setting_sources"] = ["user", "project", "local"]
+        # 设置来源（加载用户/项目/本地配置）
+        options["setting_sources"] = ["user", "project", "local"]
         
-        return ClaudeAgentOptions(**options_dict)
+        return ClaudeAgentOptions(**options)
 
     def _load_system_prompt(self, config: ClaudeConfig) -> Optional[str]:
-        """Load system prompt from CLAUDE.md and SYSTEM_PROMPT.md files."""
-        system_prompt = config.append_system_prompt or ""
-
-        # Try to load CLAUDE.md from working directory
+        """加载系统提示
+        
+        按优先级加载：
+        1. 配置中的 append_system_prompt
+        2. .claude/CLAUDE.md 或 CLAUDE.md
+        3. SYSTEM_PROMPT.md
+        """
+        prompt_parts = []
+        
+        # 配置中的提示
+        if config.append_system_prompt:
+            prompt_parts.append(config.append_system_prompt)
+        
+        # 从文件加载
         if config.working_directory:
-            claude_md_paths = [
-                Path(config.working_directory) / ".claude" / "CLAUDE.md",
-                Path(config.working_directory) / "CLAUDE.md",
-            ]
-
-            for claude_md_path in claude_md_paths:
-                if claude_md_path.exists():
+            working_dir = Path(config.working_directory)
+            
+            # 尝试加载 CLAUDE.md
+            for path in [working_dir / ".claude" / "CLAUDE.md", working_dir / "CLAUDE.md"]:
+                if path.exists():
                     try:
-                        claude_md_content = claude_md_path.read_text(encoding='utf-8')
-                        # Prepend CLAUDE.md content to system prompt
-                        if system_prompt:
-                            system_prompt = f"{claude_md_content}\n\n{system_prompt}"
-                        else:
-                            system_prompt = claude_md_content
-                        break  # Use first found CLAUDE.md
-                    except Exception:
-                        pass  # Silently ignore read errors
-
-            # Try to load SYSTEM_PROMPT.md from working directory
-            system_prompt_path = Path(config.working_directory) / "SYSTEM_PROMPT.md"
+                        prompt_parts.insert(0, path.read_text(encoding='utf-8'))
+                        break  # 只使用第一个找到的
+                    except OSError:
+                        pass  # 忽略读取错误
+            
+            # 尝试加载 SYSTEM_PROMPT.md
+            system_prompt_path = working_dir / "SYSTEM_PROMPT.md"
             if system_prompt_path.exists():
                 try:
-                    system_prompt_content = system_prompt_path.read_text(encoding='utf-8')
-                    # Append SYSTEM_PROMPT.md content to system prompt
-                    if system_prompt:
-                        system_prompt = f"{system_prompt}\n\n{system_prompt_content}"
-                    else:
-                        system_prompt = system_prompt_content
-                except Exception:
-                    pass  # Silently ignore read errors
+                    prompt_parts.append(system_prompt_path.read_text(encoding='utf-8'))
+                except OSError:
+                    pass
+        
+        return "\n\n".join(prompt_parts) if prompt_parts else None
 
-        return system_prompt if system_prompt else None
-
-    def _parse_response(
-        self, messages: list, config: ClaudeConfig
-    ) -> ClaudeResponse:
-        """Parse Claude SDK output into ClaudeResponse."""
-        try:
-            # Extract content from all messages
-            content_parts = []
-            session_id = None
-            result_text = None
+    def _parse_response(self, messages: list) -> ClaudeResponse:
+        """解析 SDK 响应
+        
+        SDK 返回三种消息类型：
+        - SystemMessage: 系统初始化信息（包含 session_id）
+        - AssistantMessage: Claude 的回复（包含实际内容）
+        - ResultMessage: 结果统计（包含总结）
+        """
+        content_parts = []
+        session_id = None
+        
+        for msg in messages:
+            msg_type = type(msg).__name__
+            # 提取会话 ID（来自 SystemMessage 或 ResultMessage）
+            if hasattr(msg, 'session_id') and msg.session_id:
+                session_id = msg.session_id
             
-            for msg in messages:
-                # Get the class name to determine message type
-                msg_type = type(msg).__name__
-                
-                # Extract session ID from SystemMessage or ResultMessage
-                if hasattr(msg, 'session_id') and msg.session_id:
-                    session_id = msg.session_id
-                
-                # Handle AssistantMessage - contains the actual response
-                if msg_type == 'AssistantMessage':
-                    if hasattr(msg, 'content') and msg.content:
-                        for block in msg.content:
-                            # TextBlock has a 'text' attribute
-                            if hasattr(block, 'text'):
-                                content_parts.append(block.text)
-                            # Fallback to string conversion
-                            elif isinstance(block, str):
-                                content_parts.append(block)
-                
-                # Handle ResultMessage - contains the final result
-                elif msg_type == 'ResultMessage':
-                    if hasattr(msg, 'result') and msg.result:
-                        result_text = msg.result
-            
-            # Use assistant message content first, fallback to result
-            final_content = "".join(content_parts) if content_parts else (result_text or "")
-            
-            return ClaudeResponse(
-                content=final_content,
-                raw_output=str(messages),
-                success=True,
-                metadata={
-                    "messages": [str(m) for m in messages],
-                    "claude_session_id": session_id,
-                },
-            )
-        except Exception as e:
-            # Fallback: try to extract any text we can
-            import traceback
-            error_details = traceback.format_exc()
-            print(f"Error parsing response: {error_details}")
-            
-            fallback_content = str(messages)
-            return ClaudeResponse(
-                content=fallback_content,
-                raw_output=fallback_content,
-                success=True,
-                error=f"Failed to parse SDK response: {str(e)}",
-            )
+            # 提取内容（来自 AssistantMessage）
+            if msg_type == 'AssistantMessage' and hasattr(msg, 'content'):
+                for block in msg.content:
+                    if hasattr(block, 'text'):  # TextBlock
+                        content_parts.append(block.text)
+                    elif isinstance(block, str):  # 字符串
+                        content_parts.append(block)
+        
+        return ClaudeResponse(
+            content="".join(content_parts),
+            raw_output=str(messages),
+            success=True,
+            metadata={
+                "claude_session_id": session_id,
+                "message_count": len(messages),
+            },
+        )
 
-    def _extract_content_from_result(self, result: dict) -> str:
-        """Extract text content from Claude SDK response."""
-        # Handle different response structures
-        if "content" in result:
-            content = result["content"]
-            if isinstance(content, str):
-                return content
-            elif isinstance(content, list):
-                # Extract text from content blocks
-                text_parts = []
-                for block in content:
-                    if isinstance(block, dict) and block.get("type") == "text":
-                        text_parts.append(block.get("text", ""))
-                return "".join(text_parts)
-
-        # Fallback: try to find any text field
-        if "result" in result:
-            return result["result"]
-        if "text" in result:
-            return result["text"]
-        if "message" in result:
-            return result["message"]
-        if "output" in result:
-            return result["output"]
-
-        # Last resort: return the whole result as string
-        return str(result)
-
+    def _print_debug_info(self, message: str, session_id: Optional[str], config: ClaudeConfig):
+        """打印调试信息"""
+        print("\n" + "=" * 80)
+        print("🚀 执行 Claude Agent SDK")
+        print("=" * 80)
+        print(f"消息: {message[:100]}{'...' if len(message) > 100 else ''}")
+        print(f"会话: {session_id or '新会话'}")
+        print(f"目录: {config.working_directory or '当前目录'}")
+        print("=" * 80 + "\n")
