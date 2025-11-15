@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from .exceptions import ClaudeExecutionError, InvalidConfigError
+from .logger import logger
 from .types import ClaudeConfig, ClaudeResponse
 
 # 尝试导入 Claude Agent SDK
@@ -195,6 +196,7 @@ class ClaudeClient:
         
         for msg in messages:
             msg_type = type(msg).__name__
+
             # 提取会话 ID（来自 SystemMessage 或 ResultMessage）
             if hasattr(msg, 'session_id') and msg.session_id:
                 session_id = msg.session_id
@@ -219,10 +221,10 @@ class ClaudeClient:
 
     def _print_debug_info(self, message: str, session_id: Optional[str], config: ClaudeConfig):
         """打印调试信息"""
-        print("\n" + "=" * 80)
-        print("🚀 执行 Claude Agent SDK")
-        print("=" * 80)
-        print(f"消息: {message[:100]}{'...' if len(message) > 100 else ''}")
-        print(f"会话: {session_id or '新会话'}")
-        print(f"目录: {config.working_directory or '当前目录'}")
-        print("=" * 80 + "\n")
+        logger.debug("=" * 80)
+        logger.debug("🚀 执行 Claude Agent SDK")
+        logger.debug("=" * 80)
+        logger.debug(f"消息: {message[:100]}{'...' if len(message) > 100 else ''}")
+        logger.debug(f"会话: {session_id or '新会话'}")
+        logger.debug(f"目录: {config.working_directory or '当前目录'}")
+        logger.debug("=" * 80)

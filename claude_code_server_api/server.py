@@ -18,6 +18,7 @@ from claude_code_server import (
     FileSessionStore,
     get_formatter,
 )
+from claude_code_server.logger import logger
 from .config import ServerConfig, ResponseMode
 from .models import (
     ChatRequest,
@@ -42,9 +43,9 @@ async def lifespan(app: FastAPI):
     global task_manager, agent, config
 
     # Startup
-    print(f"🚀 Starting Claude Code Server API...")
-    print(f"   Working Directory: {config.working_directory}")
-    print(f"   Claude Binary: {config.claude_bin}")
+    logger.info("🚀 启动 Claude Code Server API")
+    logger.info(f"   工作目录: {config.working_directory}")
+    logger.info(f"   Claude 二进制: {config.claude_bin}")
 
     # Initialize task manager
     task_manager = TaskManager(max_workers=config.max_concurrent_tasks)
@@ -57,12 +58,12 @@ async def lifespan(app: FastAPI):
 
     asyncio.create_task(cleanup_tasks())
 
-    print(f"✅ Server ready!")
+    logger.success("✅ 服务器就绪")
 
     yield
 
     # Shutdown
-    print("👋 Shutting down...")
+    logger.info("👋 关闭服务器...")
 
 
 def create_app(server_config: ServerConfig) -> FastAPI:
@@ -94,9 +95,9 @@ def create_app(server_config: ServerConfig) -> FastAPI:
     if server_config.message_formatter:
         message_formatter = get_formatter(server_config.message_formatter)
         if message_formatter:
-            print(f"   Message Formatter: {server_config.message_formatter}")
+            logger.info(f"   消息格式化器: {server_config.message_formatter}")
         else:
-            print(f"   ⚠️ Unknown formatter: {server_config.message_formatter}")
+            logger.warning(f"   ⚠️ 未知的格式化器: {server_config.message_formatter}")
 
     # Session store
     if server_config.session_store_type == "redis":

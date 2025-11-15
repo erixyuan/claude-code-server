@@ -9,6 +9,8 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, Field
 
+from claude_code_server.logger import logger
+
 
 class ResponseMode(str, Enum):
     """Response mode for chat API."""
@@ -24,6 +26,21 @@ class SessionStoreType(str, Enum):
     MEMORY = "memory"  # InMemory storage
     FILE = "file"  # File-based storage (persistent)
     REDIS = "redis"  # Redis storage
+
+
+class LoggingConfig(BaseModel):
+    """日志配置 - 基于 Loguru"""
+
+    level: str = "INFO"  # 日志级别
+    console_output: bool = True  # 是否输出到控制台
+    console_format: str = "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan> - <level>{message}</level>"
+    file_output: bool = True  # 是否输出到文件
+    file_path: str = "logs/app_{time:YYYY-MM-DD}.log"  # 文件路径
+    rotation: str = "00:00"  # 轮动策略
+    retention: str = "7 days"  # 保留时长
+    compression: Optional[str] = "zip"  # 压缩格式
+    file_level: str = "INFO"  # 文件日志级别
+    file_format: str = "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}"
 
 
 class ServerConfig(BaseModel):
@@ -68,6 +85,9 @@ class ServerConfig(BaseModel):
     max_concurrent_tasks: int = 10
     task_timeout: int = 600
 
+    # Logging settings
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
+
     class Config:
         use_enum_values = True
 
@@ -92,7 +112,7 @@ def load_config(config_path: Optional[str] = None) -> ServerConfig:
         for path in default_paths:
             if path.exists():
                 config_path = str(path)
-                print(f"📄 Auto-detected config file: {config_path}")
+                logger.info(f"📄 自动检测到配置文件: {config_path}")
                 break
 
     if config_path and Path(config_path).exists():
@@ -101,8 +121,8 @@ def load_config(config_path: Optional[str] = None) -> ServerConfig:
         return ServerConfig(**config_data)
     else:
         # Load from environment variables
-        print("⚠️  No config.yaml found, using default configuration")
-        print("   You can create config.yaml or use --config option")
+        logger.warning("⚠️ 未找到 config.yaml，使用默认配置")
+        logger.info("   提示：可以创建 config.yaml 或使用 --config 选项")
         return ServerConfig(
             host=os.getenv("SERVER_HOST", "0.0.0.0"),
             port=int(os.getenv("SERVER_PORT", "8000")),

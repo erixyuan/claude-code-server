@@ -17,6 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from claude_code_server_api import create_app, load_config
+from claude_code_server.logger import setup_logging
 
 
 def main():
@@ -58,6 +59,9 @@ def main():
 
     # Load configuration
     config = load_config(args.config)
+
+    # Initialize logging system (before creating app)
+    setup_logging(config.logging.model_dump())
 
     # Override with command line args
     if args.host:

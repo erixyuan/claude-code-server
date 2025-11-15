@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 from datetime import datetime
 
+from .logger import logger
 from .types import SessionData
 
 
@@ -60,7 +61,7 @@ class FileSessionStore:
 
             return SessionData(**data)
         except Exception as e:
-            print(f"Error loading session {session_id}: {e}")
+            logger.error(f"加载会话失败 {session_id}: {e}")
             return None
 
     def save(self, session: SessionData) -> None:
@@ -88,7 +89,7 @@ class FileSessionStore:
             with open(file_path, "w") as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
-            print(f"Error saving session {session.session_id}: {e}")
+            logger.error(f"保存会话失败 {session.session_id}: {e}")
 
     def delete(self, session_id: str) -> None:
         """Delete a session."""
@@ -122,6 +123,6 @@ class FileSessionStore:
 
                 if age > max_age_seconds:
                     file_path.unlink()
-                    print(f"Cleaned up old session: {file_path.stem}")
+                    logger.info(f"清理过期会话: {file_path.stem}")
             except Exception as e:
-                print(f"Error cleaning up {file_path}: {e}")
+                logger.error(f"清理会话失败 {file_path}: {e}")

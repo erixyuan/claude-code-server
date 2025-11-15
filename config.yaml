@@ -241,6 +241,70 @@ task_timeout: 600
 # - 极端任务: 1800 (30分钟)
 
 # ========================================
+# 日志设置 (Logging Settings)
+# ========================================
+# 基于 Loguru - Python 最优雅的日志库
+
+logging:
+  level: "INFO"
+  # 日志级别: TRACE, DEBUG, INFO, SUCCESS, WARNING, ERROR, CRITICAL
+  # 建议值:
+  # - 开发环境: DEBUG (查看所有详细信息)
+  # - 测试环境: INFO (查看关键业务事件)
+  # - 生产环境: INFO 或 WARNING (避免日志过多)
+  
+  console_output: true
+  # 是否输出到控制台
+  # - true: 彩色输出，实时查看日志（推荐）
+  # - false: 仅输出到文件
+  
+  console_format: "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan> - <level>{message}</level>"
+  # 控制台日志格式（支持彩色）
+  # 默认格式已经很好看，一般不需要修改
+  
+  file_output: true
+  # 是否输出到文件
+  # - true: 记录到文件，方便追溯（推荐）
+  # - false: 仅控制台输出
+  
+  file_path: "logs/app_{time:YYYY-MM-DD}.log"
+  # 日志文件路径
+  # {time:YYYY-MM-DD} 会自动替换为当前日期
+  # 示例:
+  # - "logs/app_{time:YYYY-MM-DD}.log" → logs/app_2025-11-15.log
+  # - "logs/app.log" → 单个文件（不推荐，会无限增长）
+  
+  rotation: "00:00"
+  # 日志文件轮动策略
+  # 可选值:
+  # - "00:00": 每天午夜轮动（推荐）
+  # - "1 day": 每24小时轮动
+  # - "100 MB": 文件达到100MB时轮动
+  # - "1 week": 每周轮动
+  
+  retention: "7 days"
+  # 日志保留时长
+  # 旧日志会自动删除
+  # 可选值:
+  # - "7 days": 保留7天（开发环境）
+  # - "30 days": 保留30天（生产环境）
+  # - 5: 保留最新5个文件
+  
+  compression: "zip"
+  # 旧日志压缩格式
+  # - "zip": 压缩为 .zip（推荐，节省空间）
+  # - "gz": 压缩为 .gz
+  # - null: 不压缩
+  
+  file_level: "INFO"
+  # 文件日志级别（可以与控制台级别不同）
+  # 示例: 控制台显示 DEBUG，文件只记录 INFO 及以上
+  
+  file_format: "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}"
+  # 文件日志格式（纯文本，不含颜色）
+  # 包含行号，方便定位问题
+
+# ========================================
 # 常见配置场景示例
 # ========================================
 
