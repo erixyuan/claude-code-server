@@ -102,7 +102,7 @@ message_formatter: "feishu"
 # ========================================
 # API 设置 (API Settings)
 # ========================================
-default_response_mode: "sync"
+default_response_mode: "async"
 # 默认响应模式（可在请求中覆盖）
 # 三种模式说明:
 #
@@ -118,10 +118,10 @@ default_response_mode: "sync"
 #    - 优点: 用户体验好，可以看到实时生成过程
 #    - 缺点: 需要前端支持 SSE
 #
-# 3. "async" - 异步模式（后台任务）
+# 3. "async" - 异步模式（后台任务）✅ 当前
 #    - 行为: 立即返回 task_id，后台处理，客户端轮询结果
-#    - 适用: 长时间任务、Webhook 回调、高并发场景
-#    - 优点: 不阻塞客户端，支持超长任务
+#    - 适用: 长时间任务、Webhook 回调（如飞书）、高并发场景
+#    - 优点: 不阻塞客户端，支持超长任务，适合飞书回调
 #    - 缺点: 需要轮询 /task/{task_id} 接口
 
 enable_cors: true
