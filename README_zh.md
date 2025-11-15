@@ -3,18 +3,18 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
-一个用于编程方式与 Claude Code CLI 交互的 Python 库。将 Claude Code 转变为强大的后端服务，支持聊天机器人、自动化工作流和 AI 代理系统。
+一个使用官方 Claude Agent SDK 与 Claude 交互的 Python 库。将 Claude 转变为强大的后端服务，支持聊天机器人、自动化工作流和 AI 代理系统。
 
 [English](README.md) | 简体中文
 
 ## 🎯 这是什么？
 
-Claude Code 是一个出色的 CLI 工具，但它是为交互式终端使用而设计的。**Claude Code Server** 将 Claude CLI 封装为简洁的 Python API，使您能够：
+**Claude Code Server** 使用官方 Claude Agent SDK 提供简洁的 Python API，使您能够：
 
-- ✅ 构建由 Claude Code 驱动的聊天机器人（Slack、Discord、飞书/Lark、微信等）
+- ✅ 构建由 Claude 驱动的聊天机器人（Slack、Discord、飞书/Lark、微信等）
 - ✅ 创建具有会话管理的多用户 AI 代理服务
 - ✅ 自动化代码审查、分析和生成工作流
-- ✅ 以编程方式利用 Claude Code 的子代理和 MCP 工具
+- ✅ 以编程方式利用 Claude 的所有功能
 - ✅ 在多轮对话中维护上下文
 
 ## 🚀 快速开始
@@ -22,35 +22,18 @@ Claude Code 是一个出色的 CLI 工具，但它是为交互式终端使用而
 ### 前置要求
 
 - Python 3.11+
-- 已安装并认证的 [Claude Code CLI](https://code.claude.com)
-
-### ⚠️ 重要：在 Claude Code 外部运行
-
-**本库设计用于独立的 Python 应用程序**，而不是在 Claude Code 内部使用。在 Claude Code 内运行会导致冲突。
-
-**正确用法：**
-```bash
-# 在常规终端中（不是 Claude Code）
-python3 your_chatbot.py
-```
-
-**错误用法：**
-```bash
-# ❌ 不要这样做 - 在 Claude Code 内运行
-claude    # 这会启动 Claude Code
-# 然后在这里尝试使用 claude-code-server 会挂起
-```
+- Claude Agent SDK
 
 ### 安装
 
 ```bash
-# 从源码安装（PyPI 包即将推出）
+# 从源码安装
 git clone https://github.com/viralt/claude-code-server.git
 cd claude-code-server
 pip install -e .
 ```
 
-### 基础用法（简单 API）
+### 基础用法
 
 ```python
 from claude_code_server import ClaudeAgent
@@ -65,31 +48,24 @@ response2 = agent.chat("我的名字是什么？", user_id="alice_123")
 print(response2.content)  # "你的名字是 Alice"
 ```
 
-### 高级用法（低级 API）
+### 高级用法
 
 ```python
-from claude_code_server import ClaudeCodeClient, ClaudeConfig
+from claude_code_server import ClaudeClient, ClaudeConfig
 
 # 使用自定义配置创建客户端
-client = ClaudeCodeClient(
+client = ClaudeClient(
     config=ClaudeConfig(output_format="json", timeout=60)
 )
 
-# 发送消息（无会话）
+# 发送消息
 response = client.chat("你好，Claude！")
 print(response.content)
-
-# 使用 Claude 的 UUID 会话进行多轮对话
-claude_session_id = response.metadata.get("claude_session_id")
-response2 = client.chat(
-    "继续我们的对话",
-    claude_session_id=claude_session_id
-)
 ```
 
 ## 📚 核心概念
 
-### ClaudeAgent（推荐）
+### ClaudeAgent（推荐）⭐
 
 **具有自动会话管理的高级 API**。非常适合聊天机器人和多用户应用程序。
 
@@ -110,19 +86,20 @@ agent.clear_session("user_123")
 ```
 
 **主要特性：**
-- ✅ 自动管理 Claude UUID 会话 ID
+- ✅ 使用官方 Claude Agent SDK
+- ✅ 自动管理 Claude 会话 ID
 - ✅ 按用户跟踪对话
 - ✅ 内置消息历史
 - ✅ 简单的 API - 只需提供 user_id
 
-### ClaudeCodeClient（低级）
+### ClaudeClient（低级）
 
-直接访问 Claude CLI，用于高级用例。
+直接访问 Claude SDK，用于高级用例。
 
 ```python
-from claude_code_server import ClaudeCodeClient, ClaudeConfig
+from claude_code_server import ClaudeClient, ClaudeConfig
 
-client = ClaudeCodeClient(
+client = ClaudeClient(
     config=ClaudeConfig(
         output_format="json",
         timeout=120,
@@ -131,9 +108,6 @@ client = ClaudeCodeClient(
 )
 
 response = client.chat("你好")
-# 提取 Claude 的会话 ID 用于下次调用
-claude_session_id = response.metadata["claude_session_id"]
-response2 = client.chat("继续", claude_session_id=claude_session_id)
 ```
 
 ### SessionManager
@@ -173,13 +147,13 @@ config = ClaudeConfig(
     timeout=300,                                  # 超时时间（秒）
     working_directory="/path/to/project",         # Claude 的工作目录
     append_system_prompt="自定义指令",             # 附加系统提示
-    model="sonnet",                               # 模型选择
+    model="claude-sonnet-4-5",                    # 模型选择
 )
 ```
 
 ## 🎯 使用场景
 
-### 1. 飞书/Lark 聊天机器人（推荐：ClaudeAgent）
+### 1. 飞书/Lark 聊天机器人
 
 ```python
 from fastapi import FastAPI, Request
@@ -205,7 +179,7 @@ async def handle_feishu_message(request: Request):
 
 ```python
 def review_code(file_path: str) -> str:
-    client = ClaudeCodeClient(
+    client = ClaudeClient(
         config=ClaudeConfig(
             allowed_tools=["Read", "Grep"],
             permission_mode=PermissionMode.ACCEPT_EDITS,
@@ -217,7 +191,7 @@ def review_code(file_path: str) -> str:
     return response.content
 ```
 
-### 3. 多用户 AI 服务（使用 ClaudeAgent）
+### 3. 多用户 AI 服务
 
 ```python
 from claude_code_server import ClaudeAgent
@@ -242,13 +216,13 @@ response = service.handle_user_message("alice", "帮我处理 Python 问题")
 - **simple_chat.py** - 基本聊天交互
 - **multi_turn_chat.py** - 带记忆的对话
 - **webhook_bot.py** - Webhook 聊天机器人模式
+- **agent_example.py** - ClaudeAgent 完整示例
 
 运行示例：
 
 ```bash
 python examples/simple_chat.py
-python examples/multi_turn_chat.py
-python examples/webhook_bot.py
+python examples/agent_example.py
 ```
 
 ## 🏗️ 架构
@@ -262,16 +236,15 @@ python examples/webhook_bot.py
            ▼
 ┌─────────────────────┐
 │ Claude Code Server  │
-│  - ClaudeCodeClient │
+│  - ClaudeClient     │
+│  - ClaudeAgent      │
 │  - SessionManager   │
 └──────────┬──────────┘
            │
            ▼
 ┌─────────────────────┐
-│   Claude CLI        │
-│  (无头模式)          │
-│  - 子代理            │
-│  - MCP 工具         │
+│ Claude Agent SDK    │
+│  (官方 SDK)         │
 └─────────────────────┘
 ```
 
@@ -297,11 +270,8 @@ pytest
 # 运行所有测试
 pytest
 
-# 带覆盖率运行
-pytest --cov=claude_code_server
-
 # 运行基础测试脚本
-python test_basic.py
+python test_simple.py
 ```
 
 ## ⚙️ 配置
@@ -330,62 +300,18 @@ manager = SessionManager(
 
 欢迎贡献！请随时提交 Pull Request。
 
-1. Fork 仓库
-2. 创建你的特性分支（`git checkout -b feature/amazing-feature`）
-3. 提交你的更改（`git commit -m 'Add amazing feature'`）
-4. 推送到分支（`git push origin feature/amazing-feature`）
-5. 打开一个 Pull Request
-
 ## 📄 许可证
 
 本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
 
 ## 🙏 致谢
 
-- 基于 Anthropic 的 [Claude Code](https://code.claude.com) 构建
-- 灵感来自于在服务器环境中访问 Claude Code 的需求
+- 基于 Anthropic 的官方 Claude Agent SDK 构建
 
 ## 📞 支持
 
 - 🐛 [报告问题](https://github.com/viralt/claude-code-server/issues)
 - 💬 [讨论](https://github.com/viralt/claude-code-server/discussions)
-- 📧 邮箱：your-email@example.com
-
-## 🌐 FastAPI 服务器（新功能！）
-
-**将 Claude Code 转变为 Web 服务！**
-
-```bash
-# 安装服务器支持
-pip install -e ".[server]"
-
-# 创建配置
-cp config.yaml.example config.yaml
-
-# 启动服务器
-python start_server.py
-
-# 访问 API 文档 http://localhost:8000/docs
-```
-
-**特性：**
-- ✅ **3 种响应模式**：同步、流式（SSE）、异步
-- ✅ **可配置**：YAML 配置、工作目录等
-- ✅ **会话管理**：内存或 Redis 存储
-- ✅ **API 认证**：可选的 API 密钥保护
-- ✅ **后台任务**：用于长时间操作的异步任务队列
-
-**查看 [API_GUIDE.md](API_GUIDE.md) 获取完整文档。**
-
-## 🗺️ 路线图
-
-- [x] PyPI 包发布结构
-- [x] FastAPI 服务器包装器 ✨
-- [x] 会话管理（内存 + Redis）
-- [ ] WebSocket 流式支持
-- [ ] 更多会话存储后端（PostgreSQL、SQLite）
-- [ ] Prometheus 指标
-- [ ] Docker 容器支持
 
 ---
 

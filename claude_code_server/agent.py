@@ -1,21 +1,22 @@
 """
-High-level agent that combines ClaudeCodeClient with SessionManager.
+High-level agent using Claude Agent SDK.
 
-This provides a simplified API that handles session management automatically.
+This provides a simplified API that handles session management automatically
+using the official Claude Agent SDK.
 """
 
 from typing import Optional, Callable
-from .client import ClaudeCodeClient
+from .client import ClaudeClient
 from .session import SessionManager, SessionStore
 from .types import ClaudeConfig, ClaudeResponse
 
 
 class ClaudeAgent:
     """
-    High-level agent that manages Claude Code interactions with automatic session handling.
+    High-level agent that manages Claude SDK interactions with automatic session handling.
 
-    This class combines ClaudeCodeClient and SessionManager to provide a simple API
-    that automatically handles Claude's UUID session IDs.
+    This class combines ClaudeClient and SessionManager to provide a simple API
+    that automatically handles Claude's session IDs.
 
     Example:
         >>> agent = ClaudeAgent()
@@ -35,13 +36,13 @@ class ClaudeAgent:
         Initialize Claude Agent.
 
         Args:
-            config: Configuration for Claude CLI
+            config: Configuration for Claude SDK
             session_store: Storage backend for sessions (defaults to InMemory)
             message_formatter: Optional function to format messages before sending to Claude.
                              Signature: (message: str, user_id: str, metadata: dict) -> str
                              Example: lambda msg, uid, meta: f"User {uid}: {msg}"
         """
-        self.client = ClaudeCodeClient(config=config)
+        self.client = ClaudeClient(config=config)
         self.session_manager = SessionManager(store=session_store)
         self.message_formatter = message_formatter
 
@@ -80,14 +81,14 @@ class ClaudeAgent:
         if self.message_formatter:
             formatted_message = self.message_formatter(message, user_id, metadata or {})
 
-        # Get Claude's UUID session ID from previous conversation (if any)
+        # Get Claude's session ID from previous conversation (if any)
         claude_session_id = session.claude_session_id
 
         # Send formatted message to Claude
         response = self.client.chat(
             message=formatted_message,
             session_id=session_id,  # User's session ID (for reference)
-            claude_session_id=claude_session_id,  # Claude's UUID session ID
+            claude_session_id=claude_session_id,  # Claude's session ID
             config_override=config_override,
         )
 
@@ -129,3 +130,4 @@ class ClaudeAgent:
         """
         session_id = session_id or f"user_{user_id}"
         self.session_manager.delete_session(session_id)
+

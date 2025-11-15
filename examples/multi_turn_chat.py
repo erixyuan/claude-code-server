@@ -8,7 +8,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from claude_code_server import ClaudeCodeClient, SessionManager, ClaudeConfig, OutputFormat
+from claude_code_server import ClaudeClient, SessionManager, ClaudeConfig, OutputFormat
 
 
 def main():
@@ -17,7 +17,7 @@ def main():
     print("=" * 60)
 
     # Create client and session manager
-    client = ClaudeCodeClient(
+    client = ClaudeClient(
         config=ClaudeConfig(
             output_format=OutputFormat.JSON,
             timeout=60,

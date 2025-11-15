@@ -1,11 +1,11 @@
 """
-Claude Code Server - A Python library to interact with Claude Code CLI programmatically.
+Claude Code Server - A Python library to interact with Claude using the official Agent SDK.
 """
 
-from .client import ClaudeCodeClient
+from .client import ClaudeClient
+from .agent import ClaudeAgent
 from .session import SessionManager, InMemorySessionStore
 from .file_session_store import FileSessionStore
-from .agent import ClaudeAgent
 from .simple_agent import SimpleAgent
 from .types import (
     ClaudeResponse,
@@ -29,19 +29,24 @@ from .formatters import (
     get_formatter,
 )
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 __all__ = [
-    "ClaudeCodeClient",
+    # Core clients
+    "ClaudeClient",
+    "ClaudeAgent",
+    # Session management
     "SessionManager",
     "InMemorySessionStore",
     "FileSessionStore",
-    "ClaudeAgent",
+    # Simple agent
     "SimpleAgent",
+    # Types
     "ClaudeResponse",
     "ClaudeMessage",
     "OutputFormat",
     "PermissionMode",
     "ClaudeConfig",
+    # Exceptions
     "ClaudeCodeError",
     "ClaudeExecutionError",
     "SessionNotFoundError",

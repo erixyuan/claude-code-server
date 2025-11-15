@@ -3,16 +3,18 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
-A Python library to interact with Claude Code CLI programmatically. Turn Claude Code into a powerful backend service for chatbots, automation workflows, and AI agent systems.
+A Python library to interact with Claude using the official Agent SDK. Turn Claude into a powerful backend service for chatbots, automation workflows, and AI agent systems.
+
+English | [简体中文](README_zh.md)
 
 ## 🎯 What is This?
 
-Claude Code is an amazing CLI tool, but it's designed for interactive terminal use. **Claude Code Server** wraps the Claude CLI in a clean Python API, enabling you to:
+**Claude Code Server** uses the official Claude Agent SDK to provide a clean Python API, enabling you to:
 
-- ✅ Build chatbots powered by Claude Code (Slack, Discord, Feishu/Lark, WeChat, etc.)
+- ✅ Build chatbots powered by Claude (Slack, Discord, Feishu/Lark, WeChat, etc.)
 - ✅ Create multi-user AI agent services with session management
 - ✅ Automate code reviews, analysis, and generation workflows
-- ✅ Leverage Claude Code's sub-agents and MCP tools programmatically
+- ✅ Leverage Claude's capabilities programmatically
 - ✅ Maintain conversation context across multiple turns
 
 ## 🚀 Quick Start
@@ -20,35 +22,18 @@ Claude Code is an amazing CLI tool, but it's designed for interactive terminal u
 ### Prerequisites
 
 - Python 3.11+
-- [Claude Code CLI](https://code.claude.com) installed and authenticated
-
-### ⚠️ Important: Run Outside Claude Code
-
-**This library is designed to be used in standalone Python applications**, not inside Claude Code itself. Running it within Claude Code will cause conflicts.
-
-**Correct usage:**
-```bash
-# In a regular terminal (not Claude Code)
-python3 your_chatbot.py
-```
-
-**Incorrect usage:**
-```bash
-# ❌ Don't do this - running inside Claude Code
-claude    # This starts Claude Code
-# Then trying to use claude-code-server here will hang
-```
+- Claude Agent SDK
 
 ### Installation
 
 ```bash
-# Install from source (PyPI package coming soon)
+# Install from source
 git clone https://github.com/viralt/claude-code-server.git
 cd claude-code-server
 pip install -e .
 ```
 
-### Basic Usage (Simple API)
+### Basic Usage
 
 ```python
 from claude_code_server import ClaudeAgent
@@ -63,31 +48,24 @@ response2 = agent.chat("What's my name?", user_id="alice_123")
 print(response2.content)  # "Your name is Alice"
 ```
 
-### Advanced Usage (Low-level API)
+### Advanced Usage
 
 ```python
-from claude_code_server import ClaudeCodeClient, ClaudeConfig
+from claude_code_server import ClaudeClient, ClaudeConfig
 
 # Create client with custom config
-client = ClaudeCodeClient(
+client = ClaudeClient(
     config=ClaudeConfig(output_format="json", timeout=60)
 )
 
-# Send a message (no session)
+# Send a message
 response = client.chat("Hello, Claude!")
 print(response.content)
-
-# Use Claude's UUID session for multi-turn
-claude_session_id = response.metadata.get("claude_session_id")
-response2 = client.chat(
-    "Continue our conversation",
-    claude_session_id=claude_session_id
-)
 ```
 
 ## 📚 Core Concepts
 
-### ClaudeAgent (Recommended)
+### ClaudeAgent (Recommended)⭐
 
 **High-level API with automatic session management.** Perfect for chatbots and multi-user applications.
 
@@ -108,19 +86,20 @@ agent.clear_session("user_123")
 ```
 
 **Key Features:**
-- ✅ Automatic Claude UUID session ID management
+- ✅ Uses official Claude Agent SDK
+- ✅ Automatic Claude session ID management
 - ✅ Per-user conversation tracking
 - ✅ Built-in message history
 - ✅ Simple API - just provide user_id
 
-### ClaudeCodeClient (Low-level)
+### ClaudeClient (Low-level)
 
-Direct access to Claude CLI for advanced use cases.
+Direct access to Claude SDK for advanced use cases.
 
 ```python
-from claude_code_server import ClaudeCodeClient, ClaudeConfig
+from claude_code_server import ClaudeClient, ClaudeConfig
 
-client = ClaudeCodeClient(
+client = ClaudeClient(
     config=ClaudeConfig(
         output_format="json",
         timeout=120,
@@ -129,9 +108,6 @@ client = ClaudeCodeClient(
 )
 
 response = client.chat("Hello")
-# Extract Claude's session ID for next call
-claude_session_id = response.metadata["claude_session_id"]
-response2 = client.chat("Continue", claude_session_id=claude_session_id)
 ```
 
 ### SessionManager
@@ -169,15 +145,15 @@ config = ClaudeConfig(
     permission_mode=PermissionMode.ACCEPT_EDITS,  # default, acceptEdits, bypassPermissions, plan
     allowed_tools=["Read", "Write", "Bash"],      # Limit tools Claude can use
     timeout=300,                                  # Timeout in seconds
-    working_directory="/path/to/project",          # Working directory for Claude
-    append_system_prompt="Custom instructions",    # Additional system prompt
-    model="sonnet",                               # Model selection
+    working_directory="/path/to/project",         # Working directory for Claude
+    append_system_prompt="Custom instructions",   # Additional system prompt
+    model="claude-sonnet-4-5",                    # Model selection
 )
 ```
 
 ## 🎯 Use Cases
 
-### 1. Feishu/Lark Chatbot (Recommended: ClaudeAgent)
+### 1. Feishu/Lark Chatbot
 
 ```python
 from fastapi import FastAPI, Request
@@ -203,7 +179,7 @@ async def handle_feishu_message(request: Request):
 
 ```python
 def review_code(file_path: str) -> str:
-    client = ClaudeCodeClient(
+    client = ClaudeClient(
         config=ClaudeConfig(
             allowed_tools=["Read", "Grep"],
             permission_mode=PermissionMode.ACCEPT_EDITS,
@@ -215,7 +191,7 @@ def review_code(file_path: str) -> str:
     return response.content
 ```
 
-### 3. Multi-User AI Service (Using ClaudeAgent)
+### 3. Multi-User AI Service
 
 ```python
 from claude_code_server import ClaudeAgent
@@ -240,13 +216,13 @@ Check out the [`examples/`](./examples) directory for complete working examples:
 - **simple_chat.py** - Basic chat interaction
 - **multi_turn_chat.py** - Conversation with memory
 - **webhook_bot.py** - Chatbot pattern for webhooks
+- **agent_example.py** - Complete ClaudeAgent example
 
 Run examples:
 
 ```bash
 python examples/simple_chat.py
-python examples/multi_turn_chat.py
-python examples/webhook_bot.py
+python examples/agent_example.py
 ```
 
 ## 🏗️ Architecture
@@ -260,16 +236,15 @@ python examples/webhook_bot.py
            ▼
 ┌─────────────────────┐
 │ Claude Code Server  │
-│  - ClaudeCodeClient │
+│  - ClaudeClient     │
+│  - ClaudeAgent      │
 │  - SessionManager   │
 └──────────┬──────────┘
            │
            ▼
 ┌─────────────────────┐
-│   Claude CLI        │
-│  (Headless Mode)    │
-│  - Sub-agents       │
-│  - MCP Tools        │
+│ Claude Agent SDK    │
+│  (Official SDK)     │
 └─────────────────────┘
 ```
 
@@ -295,11 +270,8 @@ pytest
 # Run all tests
 pytest
 
-# Run with coverage
-pytest --cov=claude_code_server
-
 # Run basic test script
-python test_basic.py
+python test_simple.py
 ```
 
 ## ⚙️ Configuration
@@ -328,62 +300,18 @@ manager = SessionManager(
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- Built on top of [Claude Code](https://code.claude.com) by Anthropic
-- Inspired by the need to make Claude Code accessible in server environments
+- Built on top of Anthropic's official Claude Agent SDK
 
 ## 📞 Support
 
 - 🐛 [Report Issues](https://github.com/viralt/claude-code-server/issues)
 - 💬 [Discussions](https://github.com/viralt/claude-code-server/discussions)
-- 📧 Email: your-email@example.com
-
-## 🌐 FastAPI Server (NEW!)
-
-**Turn Claude Code into a web service!**
-
-```bash
-# Install with server support
-pip install -e ".[server]"
-
-# Create config
-cp config.yaml.example config.yaml
-
-# Start server
-python start_server.py
-
-# Access API at http://localhost:8000/docs
-```
-
-**Features:**
-- ✅ **3 Response Modes**: Sync, Stream (SSE), Async
-- ✅ **Configurable**: YAML configuration, working directory, etc.
-- ✅ **Session Management**: InMemory or Redis storage
-- ✅ **API Authentication**: Optional API key protection
-- ✅ **Background Tasks**: Async task queue for long operations
-
-**See [API_GUIDE.md](API_GUIDE.md) for complete documentation.**
-
-## 🗺️ Roadmap
-
-- [x] PyPI package release structure
-- [x] FastAPI server wrapper ✨
-- [x] Session management (InMemory + Redis)
-- [ ] WebSocket streaming support
-- [ ] More session storage backends (PostgreSQL, SQLite)
-- [ ] Prometheus metrics
-- [ ] Docker container support
 
 ---
 

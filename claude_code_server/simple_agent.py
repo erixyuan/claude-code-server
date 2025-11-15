@@ -1,22 +1,21 @@
 """
-SimpleAgent - Alternative implementation without --resume.
+SimpleAgent - Alternative implementation without sessions.
 
-This agent doesn't use Claude's --resume feature, avoiding the cache_control limit.
+This agent doesn't use Claude's session feature.
 Instead, it manages context by including conversation history in each prompt.
 """
 
 from typing import Optional
-from .client import ClaudeCodeClient
+from .client import ClaudeClient
 from .session import SessionManager, SessionStore
 from .types import ClaudeConfig, ClaudeResponse
 
 
 class SimpleAgent:
     """
-    Simple agent that manages context without using --resume.
+    Simple agent that manages context without using sessions.
 
-    This avoids the Claude API cache_control limit by including
-    conversation history directly in the prompt.
+    This agent includes conversation history directly in the prompt.
 
     Example:
         >>> agent = SimpleAgent()
@@ -35,11 +34,11 @@ class SimpleAgent:
         Initialize Simple Agent.
 
         Args:
-            config: Configuration for Claude CLI
+            config: Configuration for Claude SDK
             session_store: Storage backend for sessions
             max_history_length: Maximum number of conversation turns to include
         """
-        self.client = ClaudeCodeClient(config=config)
+        self.client = ClaudeClient(config=config)
         self.session_manager = SessionManager(store=session_store)
         self.max_history_length = max_history_length
 
@@ -87,10 +86,10 @@ class SimpleAgent:
         else:
             full_prompt = message
 
-        # Send to Claude (no --resume, each call is independent)
+        # Send to Claude (no session, each call is independent)
         response = self.client.chat(
             message=full_prompt,
-            claude_session_id=None,  # Don't use --resume
+            claude_session_id=None,  # Don't use session
             config_override=config_override,
         )
 

@@ -15,7 +15,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from claude_code_server import ClaudeCodeClient, SessionManager, ClaudeConfig
+from claude_code_server import ClaudeClient, SessionManager, ClaudeConfig
 from typing import Dict
 
 
@@ -27,7 +27,7 @@ class ChatBot:
     """
 
     def __init__(self):
-        self.client = ClaudeCodeClient(config=ClaudeConfig(timeout=120))
+        self.client = ClaudeClient(config=ClaudeConfig(timeout=120))
         self.session_manager = SessionManager()
 
     def handle_message(self, user_id: str, message: str) -> str:
