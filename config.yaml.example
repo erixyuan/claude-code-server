@@ -11,6 +11,12 @@ claude_bin: "claude"  # Path to claude CLI executable
 working_directory: "/Users/eric/Project/viralt/claude-code-server-test-folder"  # Claude CLI working directory
 disable_prompt_caching: true  # Disable to avoid cache_control limit
 default_timeout: 300  # Default timeout in seconds
+debug_print_command: true  # Print Claude CLI command to stdout
+debug_print_full_prompt: false  # Print full system prompt
+permission_mode: "bypassPermissions"  # Options: default, acceptEdits, bypassPermissions, plan
+
+# Message formatting
+message_formatter: "feishu"  # Options: simple, imessage, feishu, platform, detailed (or null for no formatting)
 
 # API settings
 default_response_mode: "sync"  # Options: sync, stream, async

@@ -1,0 +1,30 @@
+{
+  "session_id": "user_2f3b45d586d43978b712950b1",
+  "user_id": "2f3b45d586d43978b712950b1",
+  "conversation_history": [
+    {
+      "role": "user",
+      "content": "\u4f60\u597d\uff0c\u4f60\u662f\u8c01",
+      "timestamp": "2025-11-15T16:11:38.746221"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "timestamp": "2025-11-15T16:11:38.747289"
+    },
+    {
+      "role": "user",
+      "content": "\u4f60\u597d\uff0c\u4f60\u662f\u8c01",
+      "timestamp": "2025-11-15T16:14:05.281137"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "timestamp": "2025-11-15T16:14:05.281893"
+    }
+  ],
+  "metadata": {},
+  "created_at": "2025-11-15T16:09:29.457751",
+  "last_activity": "2025-11-15T16:14:05.281896",
+  "claude_session_id": null
+}

@@ -101,7 +101,7 @@ message_formatter: "imessage"
 # ========================================
 # API 设置 (API Settings)
 # ========================================
-default_response_mode: "sync"
+default_response_mode: "async"
 # 默认响应模式（可在请求中覆盖）
 # 三种模式说明:
 #

@@ -29,6 +29,17 @@ def imessage_formatter(message: str, user_id: str, metadata: dict) -> str:
     return f"# 以下是用户id为{user_id}发过来的iMessage消息\n{message}"
 
 
+def feishu_formatter(message: str, user_id: str, metadata: dict) -> str:
+    """
+    飞书消息格式化器。
+
+    Example:
+        Input: message="我叫eric", user_id="2f3b45d586d43978b712950b"
+        Output: "以下是user_id=2f3b45d586d43978b712950b发过来的飞书消息: 我叫eric"
+    """
+    return f"以下是user_id={user_id}发过来的飞书消息: {message}"
+
+
 def platform_formatter(message: str, user_id: str, metadata: dict) -> str:
     """
     Platform-aware formatter that uses metadata["source"].
@@ -125,6 +136,7 @@ def create_custom_formatter(template: str):
 FORMATTERS = {
     "simple": simple_formatter,
     "imessage": imessage_formatter,
+    "feishu": feishu_formatter,
     "platform": platform_formatter,
     "detailed": detailed_formatter,
 }
@@ -135,13 +147,13 @@ def get_formatter(name: str):
     Get a formatter by name.
 
     Args:
-        name: Formatter name ("simple", "imessage", "platform", "detailed")
+        name: Formatter name ("simple", "imessage", "feishu", "platform", "detailed")
 
     Returns:
         Formatter function or None if not found
 
     Example:
-        formatter = get_formatter("imessage")
+        formatter = get_formatter("feishu")
         agent = ClaudeAgent(message_formatter=formatter)
     """
     return FORMATTERS.get(name)
