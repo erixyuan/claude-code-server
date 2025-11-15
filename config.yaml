@@ -82,26 +82,27 @@ debug_print_full_prompt: false
 # - true: 打印完整内容（深度调试时使用）
 # - false: 只显示字符数（推荐）
 
-message_formatter: "imessage"
+message_formatter: "feishu"
 # 消息格式化器：在发送给 Claude 之前对消息进行预处理
 # 可以添加用户上下文信息，让 Claude 更好地理解消息来源
 #
 # 可选值:
 # - null: 不格式化，直接发送原始消息
 # - "simple": 简单格式 "[用户 eric] 你是谁"
-# - "imessage": iMessage 格式 "# 以下是用户id为eric发过来的iMessage消息\n你是谁" ✅ 当前
+# - "imessage": iMessage 格式 "# 以下是用户id为eric发过来的iMessage消息\n你是谁"
+# - "feishu": 飞书格式 "以下是user_id=2f3b45d586d43978b712950b发过来的飞书消息: 我叫eric" ✅ 当前
 # - "platform": 平台感知格式（需要客户端传递 source 参数）
 # - "detailed": 详细格式，包含时间戳、平台等信息
 #
-# 示例配置（飞书/iMessage 机器人推荐）:
-# message_formatter: "imessage"  ← 当前已启用
+# 示例配置（飞书机器人推荐）:
+# message_formatter: "feishu"  ← 当前已启用
 #
 # 自定义格式化需要在代码中实现，参见 claude_code_server/formatters.py
 
 # ========================================
 # API 设置 (API Settings)
 # ========================================
-default_response_mode: "async"
+default_response_mode: "sync"
 # 默认响应模式（可在请求中覆盖）
 # 三种模式说明:
 #

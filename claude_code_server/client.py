@@ -208,9 +208,7 @@ class ClaudeCodeClient:
         config: ClaudeConfig,
     ) -> list[str]:
         """Build the Claude CLI command with all options."""
-
-        cmd = ["cd", config.working_directory, "&"]
-        cmd.extend([self.claude_bin])
+        cmd = [self.claude_bin]
 
         # Non-interactive mode
         cmd.extend(["-p", message])
@@ -236,6 +234,23 @@ class ClaudeCodeClient:
 
         # Try to load CLAUDE.md from working directory
         if config.working_directory:
+            claude_md_paths = [
+                Path(config.working_directory) / ".claude" / "CLAUDE.md",
+                Path(config.working_directory) / "CLAUDE.md",
+            ]
+
+            for claude_md_path in claude_md_paths:
+                if claude_md_path.exists():
+                    try:
+                        claude_md_content = claude_md_path.read_text(encoding='utf-8')
+                        # Prepend CLAUDE.md content to system prompt
+                        if system_prompt:
+                            system_prompt = f"{claude_md_content}\n\n{system_prompt}"
+                        else:
+                            system_prompt = claude_md_content
+                        break  # Use first found CLAUDE.md
+                    except Exception:
+                        pass  # Silently ignore read errors
 
             # Try to load SYSTEM_PROMPT.md from working directory
             system_prompt_path = Path(config.working_directory) / "SYSTEM_PROMPT.md"
