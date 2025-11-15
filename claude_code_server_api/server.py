@@ -16,6 +16,7 @@ from claude_code_server import (
     ClaudeConfig,
     InMemorySessionStore,
     FileSessionStore,
+    get_formatter,
 )
 from .config import ServerConfig, ResponseMode
 from .models import (
@@ -83,7 +84,19 @@ def create_app(server_config: ServerConfig) -> FastAPI:
         timeout=server_config.default_timeout,
         working_directory=server_config.working_directory,
         disable_prompt_caching=server_config.disable_prompt_caching,
+        debug_print_command=server_config.debug_print_command,
+        debug_print_full_prompt=server_config.debug_print_full_prompt,
+        permission_mode=server_config.permission_mode,
     )
+
+    # Get message formatter if specified
+    message_formatter = None
+    if server_config.message_formatter:
+        message_formatter = get_formatter(server_config.message_formatter)
+        if message_formatter:
+            print(f"   Message Formatter: {server_config.message_formatter}")
+        else:
+            print(f"   ⚠️ Unknown formatter: {server_config.message_formatter}")
 
     # Session store
     if server_config.session_store_type == "redis":
@@ -106,7 +119,11 @@ def create_app(server_config: ServerConfig) -> FastAPI:
     else:
         session_store = InMemorySessionStore()
 
-    agent = ClaudeAgent(config=claude_config, session_store=session_store)
+    agent = ClaudeAgent(
+        config=claude_config,
+        session_store=session_store,
+        message_formatter=message_formatter,
+    )
 
     # Create FastAPI app
     app = FastAPI(

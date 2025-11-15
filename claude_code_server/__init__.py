@@ -20,6 +20,14 @@ from .exceptions import (
     SessionNotFoundError,
     InvalidConfigError,
 )
+from .formatters import (
+    simple_formatter,
+    imessage_formatter,
+    platform_formatter,
+    detailed_formatter,
+    create_custom_formatter,
+    get_formatter,
+)
 
 __version__ = "0.1.1"
 __all__ = [
@@ -38,4 +46,11 @@ __all__ = [
     "ClaudeExecutionError",
     "SessionNotFoundError",
     "InvalidConfigError",
+    # Formatters
+    "simple_formatter",
+    "imessage_formatter",
+    "platform_formatter",
+    "detailed_formatter",
+    "create_custom_formatter",
+    "get_formatter",
 ]

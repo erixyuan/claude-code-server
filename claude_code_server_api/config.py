@@ -42,6 +42,12 @@ class ServerConfig(BaseModel):
     )  # Claude CLI 工作目录
     disable_prompt_caching: bool = True
     default_timeout: int = 300
+    debug_print_command: bool = True  # Print CLI command to stdout
+    debug_print_full_prompt: bool = False  # Print full system prompt
+    permission_mode: str = "bypassPermissions"
+
+    # Message formatting
+    message_formatter: Optional[str] = None  # Formatter name: simple, imessage, platform, detailed
 
     # API settings
     default_response_mode: ResponseMode = ResponseMode.SYNC
@@ -52,7 +58,7 @@ class ServerConfig(BaseModel):
     session_store_type: SessionStoreType = SessionStoreType.FILE  # 默认使用文件存储
     session_storage_dir: str = ".sessions"  # 文件存储目录
     redis_url: Optional[str] = "redis://localhost:6379"
-    session_ttl: int = 3600  # Session TTL in seconds
+    session_ttl: Optional[int] = None  # Session TTL in seconds (None = never expire)
 
     # Security (optional)
     api_key: Optional[str] = None  # If set, require X-API-Key header
@@ -72,16 +78,31 @@ def load_config(config_path: Optional[str] = None) -> ServerConfig:
 
     Args:
         config_path: Path to YAML config file (optional)
+                    If not provided, will look for config.yaml in current directory
 
     Returns:
         ServerConfig instance
     """
+    # If no config path provided, try to find config.yaml automatically
+    if not config_path:
+        default_paths = [
+            Path("config.yaml"),           # Current directory
+            Path.cwd() / "config.yaml",    # Explicit current directory
+        ]
+        for path in default_paths:
+            if path.exists():
+                config_path = str(path)
+                print(f"📄 Auto-detected config file: {config_path}")
+                break
+
     if config_path and Path(config_path).exists():
         with open(config_path, "r") as f:
             config_data = yaml.safe_load(f)
         return ServerConfig(**config_data)
     else:
         # Load from environment variables
+        print("⚠️  No config.yaml found, using default configuration")
+        print("   You can create config.yaml or use --config option")
         return ServerConfig(
             host=os.getenv("SERVER_HOST", "0.0.0.0"),
             port=int(os.getenv("SERVER_PORT", "8000")),

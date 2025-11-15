@@ -97,6 +97,62 @@ class ClaudeCodeClient:
         config = config_override or self.config
         cmd = self._build_command(message, claude_session_id, config)
 
+        # Print command for debugging (if enabled)
+        if config.debug_print_command:
+            print("\n" + "="*80)
+            print("🚀 Executing Claude CLI Command:")
+            print("="*80)
+
+            # Print command with optional masking
+            display_cmd = []
+            skip_next = False
+            for i, arg in enumerate(cmd):
+                if skip_next:
+                    skip_next = False
+                    continue
+
+                if arg == "--append-system-prompt" and i + 1 < len(cmd):
+                    display_cmd.append(arg)
+                    prompt_content = cmd[i + 1]
+                    if config.debug_print_full_prompt:
+                        # Show truncated version in command line
+                        display_cmd.append(f"<{len(prompt_content)} chars>")
+                    else:
+                        # Mask system prompt content
+                        if prompt_content.startswith("# CLAUDE.md"):
+                            display_cmd.append(f"<CLAUDE.md: {len(prompt_content)} chars>")
+                        else:
+                            display_cmd.append(f"<prompt: {len(prompt_content)} chars>")
+                    skip_next = True
+                elif arg == "-p" and i + 1 < len(cmd):
+                    display_cmd.append(arg)
+                    msg = cmd[i + 1]
+                    # Truncate long messages
+                    if len(msg) > 100:
+                        display_cmd.append(f'"{msg[:100]}..."')
+                    else:
+                        display_cmd.append(f'"{msg}"')
+                    skip_next = True
+                else:
+                    display_cmd.append(arg)
+
+            print(f"Command: {' '.join(display_cmd)}")
+            print(f"Working Directory: {config.working_directory or os.getcwd()}")
+
+            # Print full system prompt if requested
+            if config.debug_print_full_prompt:
+                try:
+                    prompt_idx = cmd.index("--append-system-prompt")
+                    if prompt_idx + 1 < len(cmd):
+                        print("\n📄 Full System Prompt (CLAUDE.md + Custom):")
+                        print("-" * 80)
+                        print(cmd[prompt_idx + 1])
+                        print("-" * 80)
+                except (ValueError, IndexError):
+                    pass
+
+            print("="*80 + "\n")
+
         try:
             # Prepare environment: inherit current env and add custom vars
             env = os.environ.copy()
@@ -171,9 +227,31 @@ class ClaudeCodeClient:
         if config.allowed_tools:
             cmd.extend(["--allowedTools", ",".join(config.allowed_tools)])
 
-        # System prompt
-        if config.append_system_prompt:
-            cmd.extend(["--append-system-prompt", config.append_system_prompt])
+        # System prompt - Auto-load CLAUDE.md if exists
+        system_prompt = config.append_system_prompt or ""
+
+        # Try to load CLAUDE.md from working directory
+        if config.working_directory:
+            claude_md_paths = [
+                Path(config.working_directory) / ".claude" / "CLAUDE.md",
+                Path(config.working_directory) / "CLAUDE.md",
+            ]
+
+            for claude_md_path in claude_md_paths:
+                if claude_md_path.exists():
+                    try:
+                        claude_md_content = claude_md_path.read_text(encoding='utf-8')
+                        # Prepend CLAUDE.md content to system prompt
+                        if system_prompt:
+                            system_prompt = f"{claude_md_content}\n\n{system_prompt}"
+                        else:
+                            system_prompt = claude_md_content
+                        break  # Use first found CLAUDE.md
+                    except Exception:
+                        pass  # Silently ignore read errors
+
+        if system_prompt:
+            cmd.extend(["--append-system-prompt", system_prompt])
 
         # Model selection
         if config.model:

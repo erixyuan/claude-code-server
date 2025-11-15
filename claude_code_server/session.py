@@ -58,14 +58,16 @@ class InMemorySessionStore:
 class RedisSessionStore:
     """Redis-based session storage (for production)."""
 
-    def __init__(self, redis_client, prefix: str = "claude_session:", ttl: int = 3600):
+    def __init__(self, redis_client, prefix: str = "claude_session:", ttl: Optional[int] = None):
         """
         Initialize Redis session store.
 
         Args:
             redis_client: Redis client instance
             prefix: Key prefix for session data
-            ttl: Time-to-live in seconds (default: 1 hour)
+            ttl: Time-to-live in seconds (default: None, never expire)
+                 Set to None for sessions that never expire
+                 Set to a number (e.g., 3600) for sessions that expire after that many seconds
         """
         self.redis = redis_client
         self.prefix = prefix
@@ -84,11 +86,14 @@ class RedisSessionStore:
     def save(self, session: SessionData) -> None:
         session.last_activity = datetime.now()
         key = self._make_key(session.session_id)
-        self.redis.setex(
-            key,
-            self.ttl,
-            session.model_dump_json(),
-        )
+        data = session.model_dump_json()
+
+        if self.ttl is None:
+            # No expiration - session never expires
+            self.redis.set(key, data)
+        else:
+            # Set expiration time
+            self.redis.setex(key, self.ttl, data)
 
     def delete(self, session_id: str) -> None:
         key = self._make_key(session_id)

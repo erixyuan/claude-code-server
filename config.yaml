@@ -1,35 +1,293 @@
-# Claude Code Server API Configuration
+# ========================================
+# Claude Code Server API 配置文件
+# ========================================
+# 本配置文件控制 FastAPI 服务器的所有行为
+# 适用场景：聊天机器人、多用户 AI 服务、自动化工作流
+#
+# 快速开始：
+#   1. 修改 working_directory 为你的项目路径
+#   2. 根据场景选择 session_store_type (开发用 file，生产用 redis)
+#   3. 运行: python start_server.py --config config.yaml
+#   4. 访问 API 文档: http://localhost:8000/docs
+# ========================================
 
-# Server settings
+# ========================================
+# 服务器设置 (Server Settings)
+# ========================================
 host: "0.0.0.0"
+# 监听地址
+# - "0.0.0.0": 允许外部访问（生产环境）
+# - "127.0.0.1": 仅本地访问（开发/测试）
+
 port: 8000
+# 服务器端口
+# 常用端口: 8000, 8080, 3000
+
 workers: 1
-reload: false  # Set to true for development
+# Uvicorn worker 进程数
+# 建议值:
+# - 开发环境: 1
+# - 生产环境: CPU 核心数
+# 注意: workers > 1 时需要使用 Redis session store，不能用 memory/file
 
-# Claude Code settings
-claude_bin: "claude"  # Path to claude CLI executable
-working_directory: "/Users/eric/Project/viralt/claude-code-server-test-folder"  # Claude CLI working directory
-disable_prompt_caching: true  # Disable to avoid cache_control limit
-default_timeout: 300  # Default timeout in seconds
+reload: false
+# 自动重载模式（代码改动后自动重启）
+# - true: 开发模式，代码改动立即生效
+# - false: 生产模式，性能更好
 
-# API settings
-default_response_mode: "sync"  # Options: sync, stream, async
+# ========================================
+# Claude Code 设置 (Claude Code Settings)
+# ========================================
+claude_bin: "claude"
+# Claude CLI 可执行文件路径
+# 默认值: "claude" (从 PATH 中查找)
+# 自定义路径示例:
+# - macOS Homebrew: "/opt/homebrew/bin/claude"
+# - Linux: "/usr/local/bin/claude"
+# - 指定版本: "/path/to/specific/claude"
+
+working_directory: "/Users/ericyuan/Project/viralt/viralt-pocket-manager-cc"
+# ⚠️ 重要：Claude CLI 的工作目录
+# Claude Code 会在此目录下执行所有操作（读写文件、运行命令等）
+# 使用场景:
+# - 聊天机器人: 设置为项目代码目录，让 Claude 可以访问和修改代码
+# - 代码审查: 设置为待审查的仓库目录
+# - 多项目: 可以为不同用户设置不同的工作目录（需修改代码）
+# 建议: 使用绝对路径，避免权限问题
+
+
+permission_mode: "bypassPermissions"
+
+disable_prompt_caching: true
+# 禁用 Claude API 的 prompt caching 功能
+# ⚠️ 强烈建议保持 true，避免 "cache_control limit" 错误
+# - true: 避免多轮对话时的 cache_control 错误（推荐）
+# - false: 启用缓存，可能提升性能但有 4 blocks 限制
+
+default_timeout: 300
+# Claude CLI 执行超时时间（秒）
+# 建议值:
+# - 简单对话: 60-120 秒
+# - 复杂任务（代码生成、分析）: 300-600 秒
+# - 长时间任务: 使用 async 模式 + 更长的 task_timeout
+
+debug_print_command: true
+# 调试：在标准输出打印 Claude CLI 命令
+# - true: 打印命令（开发/调试时推荐）
+# - false: 不打印（生产环境推荐）
+
+debug_print_full_prompt: false
+# 调试：打印完整的 system prompt（包括 CLAUDE.md 内容）
+# ⚠️ 注意：CLAUDE.md 内容可能很长（几千字符）
+# - true: 打印完整内容（深度调试时使用）
+# - false: 只显示字符数（推荐）
+
+message_formatter: "imessage"
+# 消息格式化器：在发送给 Claude 之前对消息进行预处理
+# 可以添加用户上下文信息，让 Claude 更好地理解消息来源
+#
+# 可选值:
+# - null: 不格式化，直接发送原始消息
+# - "simple": 简单格式 "[用户 eric] 你是谁"
+# - "imessage": iMessage 格式 "# 以下是用户id为eric发过来的iMessage消息\n你是谁" ✅ 当前
+# - "platform": 平台感知格式（需要客户端传递 source 参数）
+# - "detailed": 详细格式，包含时间戳、平台等信息
+#
+# 示例配置（飞书/iMessage 机器人推荐）:
+# message_formatter: "imessage"  ← 当前已启用
+#
+# 自定义格式化需要在代码中实现，参见 claude_code_server/formatters.py
+
+# ========================================
+# API 设置 (API Settings)
+# ========================================
+default_response_mode: "sync"
+# 默认响应模式（可在请求中覆盖）
+# 三种模式说明:
+#
+# 1. "sync" - 同步模式（推荐大多数场景）
+#    - 行为: 等待 Claude 完成后返回完整响应
+#    - 适用: 聊天机器人、简单对话、需要立即获得完整结果
+#    - 优点: 实现简单，结果完整
+#    - 缺点: 客户端需要等待
+#
+# 2. "stream" - 流式模式（SSE）
+#    - 行为: 使用 Server-Sent Events 逐步返回内容
+#    - 适用: Web UI、需要实时反馈的应用
+#    - 优点: 用户体验好，可以看到实时生成过程
+#    - 缺点: 需要前端支持 SSE
+#
+# 3. "async" - 异步模式（后台任务）
+#    - 行为: 立即返回 task_id，后台处理，客户端轮询结果
+#    - 适用: 长时间任务、Webhook 回调、高并发场景
+#    - 优点: 不阻塞客户端，支持超长任务
+#    - 缺点: 需要轮询 /task/{task_id} 接口
+
 enable_cors: true
+# 启用跨域资源共享（CORS）
+# - true: 允许跨域请求（开发/前后端分离）
+# - false: 禁用跨域（仅同源访问）
+
 cors_origins:
-  - "*"  # Allow all origins (change in production!)
+  - "*"
+# CORS 允许的来源列表
+# ⚠️ 生产环境请修改为具体域名！
+# 开发环境示例:
+#   - "*"  # 允许所有来源
+# 生产环境示例:
+#   - "https://your-frontend.com"
+#   - "https://app.example.com"
+#   - "http://localhost:3000"  # 本地开发前端
 
-# Session settings
-session_store_type: "file"  # Options: memory, file, redis
-session_storage_dir: ".sessions"  # Directory for file-based storage
-redis_url: "redis://localhost:6379"  # Redis connection URL (if using redis)
-session_ttl: 3600  # Session TTL in seconds
+# ========================================
+# 会话存储设置 (Session Storage Settings)
+# ========================================
+session_store_type: "file"
+# 会话存储后端类型
+# 三种类型对比:
+#
+# 1. "memory" - 内存存储
+#    - 优点: 最快，无需额外依赖
+#    - 缺点: 重启丢失，单进程（workers=1）
+#    - 适用: 开发测试、临时使用
+#
+# 2. "file" - 文件存储（推荐单机生产）
+#    - 优点: 持久化，重启不丢失，无需额外服务
+#    - 缺点: 单机，无法多实例共享
+#    - 适用: 单服务器生产环境、小规模应用
+#
+# 3. "redis" - Redis 存储（推荐分布式生产）
+#    - 优点: 持久化，多实例共享，支持 TTL
+#    - 缺点: 需要 Redis 服务
+#    - 适用: 多服务器、高可用、大规模应用
 
-# Security (optional)
-# api_key: "your-secret-api-key-here"  # Uncomment to enable API key auth
-# allowed_users:  # Uncomment to restrict users
+session_storage_dir: ".sessions"
+# 文件存储目录（仅当 session_store_type="file" 时使用）
+# 会话数据将存储为 JSON 文件
+# 建议: 使用相对路径，会在 working_directory 下创建
+
+redis_url: "redis://localhost:6379"
+# Redis 连接 URL（仅当 session_store_type="redis" 时使用）
+# 格式: redis://[用户名:密码@]主机:端口[/数据库]
+# 示例:
+#   - 本地: "redis://localhost:6379"
+#   - 带密码: "redis://:password@localhost:6379"
+#   - 远程: "redis://user:pass@redis.example.com:6379/0"
+#   - Redis Sentinel: "redis+sentinel://host:port/service_name"
+
+session_ttl: null
+# 会话过期时间（秒）
+# 默认值: null (永不过期)
+#
+# 设置为 null: 会话永不过期（推荐用于长期对话、聊天机器人）
+# 设置为数字: 会话在指定秒数后自动过期
+#
+# 建议值:
+# - 永不过期: null（默认）
+# - 短期对话: 1800 (30分钟)
+# - 一般对话: 3600 (1小时)
+# - 长期对话: 86400 (24小时)
+#
+# 注意:
+# - Redis 存储: 支持自动过期（使用 Redis 的 TTL 机制）
+# - File/Memory 存储: TTL 设置无效，会话持久存储
+
+# ========================================
+# 安全设置 (Security Settings)
+# ========================================
+# API Key 认证（可选）
+# 启用后，所有请求必须在 Header 中包含: X-API-Key: your-key
+# api_key: "your-secret-api-key-here"
+#
+# 使用场景:
+# - 防止未授权访问
+# - 多租户系统中区分不同客户端
+#
+# 客户端调用示例:
+# curl -H "X-API-Key: your-key" http://localhost:8000/chat
+
+# 用户白名单（可选）
+# 启用后，仅允许列表中的 user_id 访问
+# allowed_users:
 #   - "alice"
 #   - "bob"
+#   - "admin"
+#
+# 使用场景:
+# - 限制特定用户访问
+# - 内部测试环境
+# - 付费用户系统
 
-# Task queue settings (for async mode)
+# ========================================
+# 任务队列设置 (Task Queue Settings)
+# ========================================
+# 仅在 response_mode="async" 时使用
+
 max_concurrent_tasks: 10
+# 最大并发任务数
+# 限制同时执行的后台任务数量，避免资源耗尽
+# 建议值:
+# - 小型服务器: 5-10
+# - 中型服务器: 10-20
+# - 大型服务器: 20-50
+# 注意: 每个任务会启动一个 Claude CLI 进程
+
 task_timeout: 600
+# 单个任务超时时间（秒）
+# 建议值:
+# - 一般任务: 600 (10分钟)
+# - 复杂任务: 1200 (20分钟)
+# - 极端任务: 1800 (30分钟)
+
+# ========================================
+# 常见配置场景示例
+# ========================================
+
+# 场景 1: 本地开发
+# -------------------
+# host: "127.0.0.1"
+# port: 8000
+# workers: 1
+# reload: true
+# session_store_type: "memory"
+# enable_cors: true
+# cors_origins: ["*"]
+
+# 场景 2: 生产环境（单机）
+# -------------------
+# host: "0.0.0.0"
+# port: 8000
+# workers: 1
+# reload: false
+# session_store_type: "file"
+# session_storage_dir: "/var/lib/claude-sessions"
+# api_key: "your-production-api-key"
+# cors_origins: ["https://your-app.com"]
+
+# 场景 3: 生产环境（分布式）
+# -------------------
+# host: "0.0.0.0"
+# port: 8000
+# workers: 4
+# reload: false
+# session_store_type: "redis"
+# redis_url: "redis://:password@redis.prod.com:6379/0"
+# api_key: "your-production-api-key"
+# allowed_users: ["user1", "user2", "user3"]
+
+# 场景 4: 飞书/Lark 聊天机器人
+# -------------------
+# default_response_mode: "sync"
+# session_store_type: "redis"  # 支持多实例
+# session_ttl: null  # 永不过期，保持长期对话
+# default_timeout: 180  # 3分钟超时
+# max_concurrent_tasks: 20
+
+# 场景 5: 代码审查服务
+# -------------------
+# working_directory: "/path/to/code/repos"
+# default_response_mode: "async"  # 审查可能较慢
+# default_timeout: 600
+# task_timeout: 1200
+# allowed_tools: ["Read", "Grep"]  # 限制工具使用
+

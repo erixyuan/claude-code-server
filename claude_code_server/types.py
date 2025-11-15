@@ -56,6 +56,8 @@ class ClaudeConfig(BaseModel):
     model: Optional[str] = None
     env: Optional[dict[str, str]] = None  # Additional environment variables
     disable_prompt_caching: bool = True  # Disable caching to avoid cache_control limit
+    debug_print_command: bool = True  # Print Claude CLI command to stdout
+    debug_print_full_prompt: bool = False  # Print full system prompt (including CLAUDE.md)
 
     class Config:
         use_enum_values = True

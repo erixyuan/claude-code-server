@@ -4,7 +4,7 @@ High-level agent that combines ClaudeCodeClient with SessionManager.
 This provides a simplified API that handles session management automatically.
 """
 
-from typing import Optional
+from typing import Optional, Callable
 from .client import ClaudeCodeClient
 from .session import SessionManager, SessionStore
 from .types import ClaudeConfig, ClaudeResponse
@@ -29,6 +29,7 @@ class ClaudeAgent:
         self,
         config: Optional[ClaudeConfig] = None,
         session_store: Optional[SessionStore] = None,
+        message_formatter: Optional[Callable[[str, str, Optional[dict]], str]] = None,
     ):
         """
         Initialize Claude Agent.
@@ -36,9 +37,13 @@ class ClaudeAgent:
         Args:
             config: Configuration for Claude CLI
             session_store: Storage backend for sessions (defaults to InMemory)
+            message_formatter: Optional function to format messages before sending to Claude.
+                             Signature: (message: str, user_id: str, metadata: dict) -> str
+                             Example: lambda msg, uid, meta: f"User {uid}: {msg}"
         """
         self.client = ClaudeCodeClient(config=config)
         self.session_manager = SessionManager(store=session_store)
+        self.message_formatter = message_formatter
 
     def chat(
         self,
@@ -46,6 +51,7 @@ class ClaudeAgent:
         user_id: str,
         session_id: Optional[str] = None,
         config_override: Optional[ClaudeConfig] = None,
+        metadata: Optional[dict] = None,
     ) -> ClaudeResponse:
         """
         Send a message to Claude with automatic session management.
@@ -55,6 +61,7 @@ class ClaudeAgent:
             user_id: User identifier (used for session tracking)
             session_id: Optional custom session ID (defaults to user_id)
             config_override: Override default config for this request
+            metadata: Optional metadata for message formatting (e.g., {"source": "imessage"})
 
         Returns:
             ClaudeResponse containing the response and metadata
@@ -68,12 +75,17 @@ class ClaudeAgent:
             user_id=user_id,
         )
 
+        # Format message if formatter is provided
+        formatted_message = message
+        if self.message_formatter:
+            formatted_message = self.message_formatter(message, user_id, metadata or {})
+
         # Get Claude's UUID session ID from previous conversation (if any)
         claude_session_id = session.claude_session_id
 
-        # Send message to Claude
+        # Send formatted message to Claude
         response = self.client.chat(
-            message=message,
+            message=formatted_message,
             session_id=session_id,  # User's session ID (for reference)
             claude_session_id=claude_session_id,  # Claude's UUID session ID
             config_override=config_override,
