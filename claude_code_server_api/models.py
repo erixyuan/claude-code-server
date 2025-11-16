@@ -18,6 +18,14 @@ class ChatRequest(BaseModel):
     )
     timeout: Optional[int] = Field(None, description="Override default timeout")
 
+    # Message debouncing (for async mode)
+    enable_debounce: Optional[bool] = Field(
+        None, description="Enable message debouncing (default: use server config)"
+    )
+    debounce_window: Optional[float] = Field(
+        None, description="Debounce window in seconds (default: use server config)"
+    )
+
 
 class ChatResponse(BaseModel):
     """Synchronous chat response."""

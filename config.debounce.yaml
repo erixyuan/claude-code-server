@@ -1,0 +1,74 @@
+# Example configuration with message debouncing enabled
+# Copy this to config.yaml or use: claude-code-server --config config.debounce.yaml
+
+# Server settings
+host: "0.0.0.0"
+port: 8000
+workers: 1
+reload: false
+
+# Claude Code settings
+claude_bin: "claude"  # Path to Claude CLI executable
+working_directory: "."  # Working directory for Claude
+disable_prompt_caching: true
+default_timeout: 300
+debug_print_command: true
+debug_print_full_prompt: false
+permission_mode: "bypassPermissions"
+
+# API settings
+default_response_mode: "async"  # Use async mode by default
+enable_cors: true
+cors_origins: ["*"]
+
+# Session settings
+session_store_type: "file"  # Options: memory, file, redis
+session_storage_dir: ".sessions"
+session_ttl: null  # Never expire (null = infinite)
+
+# Security (optional)
+# api_key: "your-secret-key"  # Uncomment to require API key
+# allowed_users: ["user1", "user2"]  # Uncomment to restrict users
+
+# Task queue settings
+max_concurrent_tasks: 10
+task_timeout: 600
+
+# ============================================================
+# Message Debouncing Settings (NEW!)
+# ============================================================
+#
+# Message debouncing automatically combines messages sent in quick succession
+# This is useful when users have the habit of sending messages in multiple parts
+#
+# Example scenario:
+#   User sends: "Hello" -> "How are you?"
+#   Without debouncing: 2 separate API calls to Claude
+#   With debouncing: 1 combined call with "Hello\nHow are you?"
+#
+
+# Enable automatic message combining (default: true)
+enable_message_debouncing: true
+
+# Time window in seconds to wait for additional messages (default: 2.0)
+# If a new message arrives within this window, the timer resets
+# Recommended: 2-3 seconds for typical chat scenarios
+debounce_window: 2.0
+
+# Maximum allowed debounce window (safety limit, default: 10.0)
+# Prevents clients from setting excessively long debounce windows
+max_debounce_window: 10.0
+
+# String used to join messages when combining (default: "\n")
+# Options: "\n" (newline), " " (space), "\n\n" (double newline)
+message_separator: "\n"
+
+# Logging settings
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  console_output: true
+  file_output: true
+  file_path: "logs/app_{time:YYYY-MM-DD}.log"
+  rotation: "00:00"  # Rotate at midnight
+  retention: "7 days"
+  compression: "zip"

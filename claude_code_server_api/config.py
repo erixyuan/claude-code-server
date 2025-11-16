@@ -85,6 +85,12 @@ class ServerConfig(BaseModel):
     max_concurrent_tasks: int = 10
     task_timeout: int = 600
 
+    # Message debouncing settings (for async mode)
+    enable_message_debouncing: bool = True  # Enable automatic message combining
+    debounce_window: float = 2.0  # Time window in seconds to wait for additional messages
+    max_debounce_window: float = 10.0  # Maximum allowed debounce window
+    message_separator: str = "\n"  # String to join messages when combining
+
     # Logging settings
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 

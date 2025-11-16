@@ -51,33 +51,49 @@ class ClaudeClient:
         config_override: Optional[ClaudeConfig] = None,
     ) -> ClaudeResponse:
         """发送消息给 Claude
-        
+
         Args:
             message: 要发送的消息
             session_id: 用户会话 ID（仅用于引用）
             claude_session_id: Claude SDK 的会话 ID（用于恢复对话）
             config_override: 覆盖默认配置
-            
+
         Returns:
             ClaudeResponse 包含响应内容和元数据
         """
         config = config_override or self.config
-        
+
+        # 打印调用信息
+        logger.info("=" * 80)
+        logger.info("🚀 调用 Claude Agent SDK")
+        logger.info("=" * 80)
+        logger.info(f"📝 用户 Query: {message}")
+        logger.info(f"🔑 Claude Session ID: {claude_session_id or '新会话'}")
+        logger.info(f"📂 工作目录: {config.working_directory or '当前目录'}")
+
         # 调试信息（如果启用）
         if config.debug_print_command:
             self._print_debug_info(message, claude_session_id, config)
-        
+
         try:
             # 1. 构建选项
             options = self._build_options(config, claude_session_id)
-            
+            logger.info(f"⚙️  配置选项: model={options.model}, timeout={config.timeout}s")
+
             # 2. 调用 SDK（异步转同步）
+            logger.info("⏳ 等待 Claude 响应...")
             messages = self._run_query(message, options)
-            
+
             # 3. 解析响应
-            return self._parse_response(messages)
-            
+            response = self._parse_response(messages)
+            logger.info(f"✅ Claude 响应完成，内容长度: {len(response.content)} 字符")
+            logger.info("=" * 80)
+
+            return response
+
         except Exception as e:
+            logger.error(f"❌ Claude Agent SDK 执行失败: {str(e)}")
+            logger.info("=" * 80)
             raise ClaudeExecutionError(
                 f"Claude Agent SDK 执行失败: {str(e)}",
                 return_code=-1,
@@ -85,14 +101,29 @@ class ClaudeClient:
 
     def _run_query(self, message: str, options: ClaudeAgentOptions) -> list:
         """运行异步查询（同步方式）
-        
+
         SDK 的 query 是异步生成器，这里转换为同步调用。
         """
         async def collect_messages():
             """收集所有消息"""
             messages = []
+            message_count = 0
             async for msg in query(prompt=message, options=options):
                 logger.info(f"🔍 收到消息: {msg}")
+                # message_count += 1
+                # msg_type = type(msg).__name__
+                # logger.debug(f"📨 SDK 消息 #{message_count}: {msg_type}")
+                #
+                # # 详细打印消息内容
+                # if msg_type == 'AssistantMessage' and hasattr(msg, 'content'):
+                #     for block in msg.content:
+                #         if hasattr(block, 'text'):
+                #             text_preview = block.text[:200] if len(block.text) > 200 else block.text
+                #             logger.debug(f"   💬 内容预览: {text_preview}...")
+                #         elif isinstance(block, str):
+                #             text_preview = block[:200] if len(block) > 200 else block
+                #             logger.debug(f"   💬 内容预览: {text_preview}...")
+
                 messages.append(msg)
             return messages
         

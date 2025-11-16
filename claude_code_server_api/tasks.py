@@ -29,6 +29,8 @@ class TaskManager:
         Returns:
             task_id: Unique task identifier
         """
+        from claude_code_server.logger import logger
+
         task_id = str(uuid.uuid4())
 
         task_status = TaskStatus(
@@ -38,6 +40,22 @@ class TaskManager:
         )
 
         self.tasks[task_id] = task_status
+
+        logger.info("=" * 80)
+        logger.info("🎯 创建异步任务")
+        logger.info("=" * 80)
+        logger.info(f"📋 Task ID: {task_id}")
+        logger.info(f"👤 User ID: {user_id}")
+        logger.info(f"🔑 Session ID: {session_id or f'user_{user_id}'}")
+        logger.info(f"📝 消息内容: {message}")
+        logger.info(f"📏 消息长度: {len(message)} 字符")
+        # 检测是否为合并消息（包含换行符）
+        if '\n' in message:
+            parts = message.split('\n')
+            logger.info(f"🔄 检测到合并消息，包含 {len(parts)} 部分:")
+            for i, part in enumerate(parts, 1):
+                logger.info(f"   {i}. {part[:100]}{'...' if len(part) > 100 else ''}")
+        logger.info("=" * 80)
 
         # Submit to executor
         asyncio.create_task(self._execute_task(task_id, agent, message, user_id, session_id))
@@ -53,16 +71,25 @@ class TaskManager:
         session_id: Optional[str],
     ):
         """Execute chat task in background."""
+        from claude_code_server.logger import logger
+
         async with self._lock:
             if task_id in self.tasks:
                 self.tasks[task_id].status = "processing"
 
+        logger.info(f"▶️  开始执行任务 {task_id}")
+
         try:
             # Run in thread pool (since agent.chat is sync)
             loop = asyncio.get_event_loop()
+            start_time = datetime.now()
+
             response = await loop.run_in_executor(
                 self.executor, lambda: agent.chat(message, user_id, session_id)
             )
+
+            duration = (datetime.now() - start_time).total_seconds()
+            logger.info(f"✅ 任务 {task_id} 执行成功，耗时: {duration:.2f}s")
 
             # Update task with result
             async with self._lock:
@@ -78,6 +105,7 @@ class TaskManager:
                     )
 
         except Exception as e:
+            logger.error(f"❌ 任务 {task_id} 执行失败: {str(e)}")
             async with self._lock:
                 if task_id in self.tasks:
                     self.tasks[task_id].status = "failed"

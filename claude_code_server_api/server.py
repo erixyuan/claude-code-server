@@ -29,10 +29,12 @@ from .models import (
     HealthResponse,
 )
 from .tasks import TaskManager
+from .message_buffer import MessageBuffer
 
 
 # Global state
 task_manager: Optional[TaskManager] = None
+message_buffer: Optional[MessageBuffer] = None
 agent: Optional[ClaudeAgent] = None
 config: Optional[ServerConfig] = None
 
@@ -40,7 +42,7 @@ config: Optional[ServerConfig] = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
-    global task_manager, agent, config
+    global task_manager, message_buffer, agent, config
 
     # Startup
     logger.info("🚀 启动 Claude Code Server API")
@@ -49,6 +51,16 @@ async def lifespan(app: FastAPI):
 
     # Initialize task manager
     task_manager = TaskManager(max_workers=config.max_concurrent_tasks)
+
+    # Initialize message buffer
+    message_buffer = MessageBuffer(
+        default_window=config.debounce_window,
+        message_separator=config.message_separator,
+    )
+    if config.enable_message_debouncing:
+        logger.info(
+            f"   消息防抖: 已启用 (窗口: {config.debounce_window}s, 分隔符: {repr(config.message_separator)})"
+        )
 
     # Start background task cleanup
     async def cleanup_tasks():
@@ -183,6 +195,22 @@ def create_app(server_config: ServerConfig) -> FastAPI:
 
         Returns complete response once ready.
         """
+        # 打印请求日志
+        logger.info("=" * 80)
+        logger.info("📨 收到 /chat 请求 (sync mode)")
+        logger.info("=" * 80)
+        logger.info(f"👤 User ID: {request.user_id}")
+        logger.info(f"🔑 Session ID: {request.session_id or f'user_{request.user_id}' + ' (默认)'}")
+        logger.info(f"📝 Message: {request.message}")
+        logger.info(f"📏 Message Length: {len(request.message)} 字符")
+        logger.info(f"⚙️  Response Mode: {request.response_mode or 'sync (默认)'}")
+        logger.info(f"⏱️  Timeout: {request.timeout or config.default_timeout} 秒")
+        if request.enable_debounce is not None:
+            logger.info(f"🔄 Debounce: {request.enable_debounce}")
+        if request.debounce_window is not None:
+            logger.info(f"⏰ Debounce Window: {request.debounce_window}s")
+        logger.info("=" * 80)
+
         try:
             response = await asyncio.get_event_loop().run_in_executor(
                 None,
@@ -199,6 +227,7 @@ def create_app(server_config: ServerConfig) -> FastAPI:
                 metadata=response.metadata,
             )
         except Exception as e:
+            logger.error(f"❌ /chat 端点错误: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail=str(e))
 
     @app.post(
@@ -211,6 +240,17 @@ def create_app(server_config: ServerConfig) -> FastAPI:
 
         Returns SSE stream of response chunks.
         """
+        # 打印请求日志
+        logger.info("=" * 80)
+        logger.info("📨 收到 /chat/stream 请求 (stream mode)")
+        logger.info("=" * 80)
+        logger.info(f"👤 User ID: {request.user_id}")
+        logger.info(f"🔑 Session ID: {request.session_id or f'user_{request.user_id}' + ' (默认)'}")
+        logger.info(f"📝 Message: {request.message}")
+        logger.info(f"📏 Message Length: {len(request.message)} 字符")
+        logger.info(f"⚙️  Response Mode: {request.response_mode or 'stream (默认)'}")
+        logger.info(f"⏱️  Timeout: {request.timeout or config.default_timeout} 秒")
+        logger.info("=" * 80)
 
         async def event_generator():
             try:
@@ -239,6 +279,7 @@ def create_app(server_config: ServerConfig) -> FastAPI:
                 }
 
             except Exception as e:
+                logger.error(f"❌ /chat/stream 端点错误: {str(e)}", exc_info=True)
                 yield {
                     "event": "error",
                     "data": {"error": str(e)},
@@ -256,18 +297,90 @@ def create_app(server_config: ServerConfig) -> FastAPI:
         Send a message to Claude (async mode).
 
         Returns immediately with task_id for status checking.
+
+        Supports message debouncing: if enabled, messages sent within the debounce
+        window will be automatically combined before processing.
         """
+        # 打印请求日志
+        logger.info("=" * 80)
+        logger.info("📨 收到 /chat/async 请求 (async mode)")
+        logger.info("=" * 80)
+        logger.info(f"👤 User ID: {request.user_id}")
+        logger.info(f"🔑 Session ID: {request.session_id or f'user_{request.user_id}' + ' (默认)'}")
+        logger.info(f"📝 Message: {request.message}")
+        logger.info(f"📏 Message Length: {len(request.message)} 字符")
+        logger.info(f"⚙️  Response Mode: {request.response_mode or 'async (默认)'}")
+        logger.info(f"⏱️  Timeout: {request.timeout or config.default_timeout} 秒")
+
         try:
-            task_id = task_manager.create_task(
-                agent, request.message, request.user_id, request.session_id
+            # Determine session_id for buffer key
+            session_id = request.session_id or f"user_{request.user_id}"
+
+            # Check if debouncing is enabled
+            enable_debounce = (
+                request.enable_debounce
+                if request.enable_debounce is not None
+                else config.enable_message_debouncing
             )
 
-            return AsyncChatResponse(
-                task_id=task_id,
-                status="processing",
-                message="Task submitted successfully",
-            )
+            logger.info(f"🔄 Debounce Enabled: {enable_debounce}")
+
+            if enable_debounce:
+                # Use debouncing
+                debounce_window = (
+                    request.debounce_window
+                    if request.debounce_window is not None
+                    else config.debounce_window
+                )
+                logger.info(f"⏰ Debounce Window: {debounce_window}s")
+                logger.info(f"📮 消息将被缓冲，等待更多消息...")
+                logger.info("=" * 80)
+
+                # Callback to create task when messages are flushed
+                async def process_combined_message(combined_message: str):
+                    task_id = task_manager.create_task(
+                        agent, combined_message, request.user_id, request.session_id
+                    )
+                    logger.info(
+                        f"🚀 Created task {task_id} with combined message for session {session_id}"
+                    )
+
+                # Add message to buffer
+                await message_buffer.add_message(
+                    session_id=session_id,
+                    message=request.message,
+                    callback=process_combined_message,
+                    debounce_window=debounce_window,
+                )
+
+                # Get pending message count
+                pending_count = await message_buffer.get_pending_count(session_id)
+
+                return AsyncChatResponse(
+                    task_id="pending",  # Special task_id indicating buffering
+                    status="buffering",
+                    message=f"Message buffered ({pending_count} pending, will process in {debounce_window}s)",
+                )
+            else:
+                # No debouncing - create task immediately
+                logger.info(f"🚀 立即创建任务（防抖已禁用）")
+                logger.info("=" * 80)
+
+                task_id = task_manager.create_task(
+                    agent, request.message, request.user_id, request.session_id
+                )
+
+                logger.info(f"✅ 任务已创建: {task_id}")
+
+                return AsyncChatResponse(
+                    task_id=task_id,
+                    status="processing",
+                    message="Task submitted successfully",
+                )
+
         except Exception as e:
+            logger.error(f"❌ /chat/async 端点错误: {str(e)}", exc_info=True)
+            logger.error(f"   请求详情: user_id={request.user_id}, message={request.message[:100]}")
             raise HTTPException(status_code=500, detail=str(e))
 
     @app.get(
@@ -309,6 +422,7 @@ def create_app(server_config: ServerConfig) -> FastAPI:
                 total_messages=len(history),
             )
         except Exception as e:
+            logger.error(f"❌ /session/{session_id}/history 端点错误: {str(e)}", exc_info=True)
             raise HTTPException(status_code=404, detail=str(e))
 
     @app.delete(
@@ -322,6 +436,7 @@ def create_app(server_config: ServerConfig) -> FastAPI:
             agent.clear_session(user_id, session_id)
             return {"message": "Session cleared successfully"}
         except Exception as e:
+            logger.error(f"❌ DELETE /session/{session_id} 端点错误: {str(e)}", exc_info=True)
             raise HTTPException(status_code=404, detail=str(e))
 
     return app
